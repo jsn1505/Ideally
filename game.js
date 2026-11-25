@@ -1055,7 +1055,7 @@
   // ---------- the Housing Lane: 7 plots players can buy, and the Lodgings for everyone else ----------
 
   /* ---------- the Housing Lane: plots, the Lodgings and the lane map ---------- */
-  const LANEW = 32,
+  const LANEW = 38,
     LANEH = 18,
     lane = mkScene('lane', 'Housing lane', LANEW, LANEH, 0);
   lane.kind = 'lane';
@@ -1093,7 +1093,8 @@
     roof: '#8a6a4a',
     wall: '#efe0c8'
   };
-  const LANEB = [...LPLOTS, LODGE];
+  const LIBRARY = { x: 31, y: 2, w: 6, h: 4, door: 33, name: 'Library', library: true, parent: 'lane' };
+  const LANEB = [...LPLOTS, LODGE, LIBRARY];
   for (const p of LPLOTS)
     scenes[p.scene] = house(p.scene, 'A house on the lane', '#7a6a5a', '#b98758', '#c8434b');
   {
@@ -1108,7 +1109,7 @@
         t[y][x] = 1;
         keep[y][x] = true;
       });
-    path(1, 7, 30, 8);
+    path(1, 7, 36, 8);
     path(2, 15, 29, 15);
     path(15, 9, 16, 17);
     for (const b of LANEB) {
@@ -3862,6 +3863,7 @@
       $('jMsg').textContent = '';
     }
     st.joined = true;
+    awayAfterJoin();
     renderAcct();
     setVilLabel();
     $('join').hidden = true;
@@ -4012,6 +4014,7 @@
       seen.add(key);
       let r = NET.remotes.get(key);
       if (!r) {
+        NET.lastSend = 0; // a new player arrived: send our position right away
         r = {
           id: key,
           remote: true,
@@ -4057,7 +4060,11 @@
     const r = NET.remotes.get(p && p.id);
     if (!r) return;
     const sc = String(p.scene);
-    if (r.scene !== sc) r.snap = true;
+    if (r.scene !== sc) {
+      r.snap = true;
+      // someone just walked into the place you're in: let them see you straight away
+      if (player.scene === sc) NET.lastSend = 0;
+    }
     r.scene = sc;
     r.nx = +p.x || 0;
     r.ny = +p.y || 0;
@@ -4127,7 +4134,17 @@
       x = Math.round(player.x),
       y = Math.round(player.y),
       pos = [x, y, sk, player.dir, !!player.sit].join();
-    if ((pos !== NET.lastPos && now - NET.lastSend > 110) || now - NET.lastSend > 2000) {
+    // Only send often when someone else is in the same place to see you: about 3 a second while moving,
+    // a heartbeat every 4 seconds otherwise, and every 15 seconds when nobody is around.
+    let watched = false;
+    for (const r of NET.remotes.values())
+      if (r.scene === sk) {
+        watched = true;
+        break;
+      }
+    const gap = watched ? 330 : 5000,
+      beat = watched ? 4000 : 15000;
+    if ((pos !== NET.lastPos && now - NET.lastSend > gap) || now - NET.lastSend > beat) {
       NET.lastSend = now;
       NET.lastPos = pos;
       NET.ch.send({
@@ -4443,7 +4460,7 @@
     if (SESSION && !isGuest())
       el.innerHTML = `<span>Logged in as <b>${esc(SESSION.user.email || '')}</b></span><button data-out>Log out</button>`;
     else
-      el.innerHTML = `<span>${SESSION ? 'Playing as a guest on this browser.' : 'New here? Just pick a village.'} Played before?</span><button data-login>Log in with email</button><span class="loginform" hidden><input type="email" id="lEmail" placeholder="you@example.com" aria-label="Email"><button class="primary" data-send>Send me a link</button></span>`;
+      el.innerHTML = `<span>${SESSION ? 'Playing as a guest on this browser.' : 'New here? Just pick a village.'} Played before?</span><button data-login>Log in with email</button><span class="loginform" hidden><input type="email" id="lEmail" placeholder="you@example.com" aria-label="Email"><button class="primary" data-send>Send me a link</button><p class="legalnote">By logging in you agree to the <a data-legal>Terms and Privacy notice</a>. We only use your email to connect your account across devices.</p></span>`;
     if (!$('acctM').hidden) renderAcctModal();
   }
   $('acct').addEventListener('click', async e => {
@@ -4479,7 +4496,7 @@
       b.innerHTML = `<p>Logged in as <b>${esc(SESSION.user.email || '')}</b>. Your coins, farm, horse, pet and designs are saved to this account, so you can play on any device.</p><div class="row"><button data-out>Log out</button></div>`;
     else
       b.innerHTML = `<p>You're playing as a guest. Your progress is saved, but only on this browser. Add your email to keep your account and log in on any device. We'll send a link to confirm it.</p>
-  <div class="row"><input type="email" id="aEmail" placeholder="you@example.com" aria-label="Email"><button class="primary" data-save>Save my account</button></div>`;
+  <div class="row"><input type="email" id="aEmail" placeholder="you@example.com" aria-label="Email"><button class="primary" data-save>Save my account</button></div><p class="legalnote">By saving your account you agree to the <a data-legal>Terms and Privacy notice</a>. We only use your email to connect your account across devices.</p>`;
   }
   $('acctBtn').addEventListener('click', () => {
     for (const k in K) K[k] = 0;
@@ -5274,7 +5291,259 @@
     !$('acctM').hidden ||
     !$('travel').hidden ||
     !$('postM').hidden ||
-    !$('battle').hidden;
+    !$('battle').hidden ||
+    !$('libM').hidden ||
+    !$('awayM').hidden ||
+    !$('legalM').hidden;
+
+  /* ---------- terms & privacy ---------- */
+  document.addEventListener('click', e => {
+    if (!e.target.closest('[data-legal]')) return;
+    e.preventDefault();
+    const c = (window.IDEALLY_CONFIG || {}).contact;
+    if (c) $('lgContact').textContent = `Email ${c}`;
+    $('legalM').hidden = false;
+    $('lgX').focus({ preventScroll: true });
+  });
+  $('lgX').addEventListener('click', () => ($('legalM').hidden = true));
+
+  /* ---------- the library: articles players share ---------- */
+  let ARTICLES = [
+    {
+      id: 's1',
+      url: 'https://en.wikipedia.org/wiki/Perfect_competition',
+      title: 'Perfect competition',
+      note: 'The textbook market the village markets are loosely modelled on.',
+      by_name: 'The Library',
+      recs: 0
+    },
+    {
+      id: 's2',
+      url: 'https://en.wikipedia.org/wiki/Tragedy_of_the_commons',
+      title: 'Tragedy of the commons',
+      note: 'Why shared things get overused. Think of the village lake.',
+      by_name: 'The Library',
+      recs: 0
+    },
+    {
+      id: 's3',
+      url: 'https://en.wikipedia.org/wiki/Price_elasticity_of_demand',
+      title: 'Price elasticity of demand',
+      note: 'How much people cut back when prices rise.',
+      by_name: 'The Library',
+      recs: 0
+    }
+  ];
+  const safeUrl = u => /^https:\/\/[^\s"'<>]+$/.test(u || '');
+  const hostOf = u => {
+    try {
+      return new URL(u).hostname.replace(/^www\./, '');
+    } catch (e) {
+      return '';
+    }
+  };
+  async function openLibrary() {
+    for (const k in K) K[k] = 0;
+    if (NET.ch) {
+      const { data } = await NET.sb
+        .from('articles')
+        .select('id,url,title,note,by_name,village,recs,created_at')
+        .order('recs', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(60);
+      if (data) ARTICLES = data;
+    }
+    renderLibrary();
+    $('libM').hidden = false;
+    $('libX').focus({ preventScroll: true });
+  }
+  function renderLibrary() {
+    const list = ARTICLES.filter(a => safeUrl(a.url) && !a.hidden);
+    $('libList').innerHTML = list.length
+      ? list
+          .map(
+            a => `<div class="art"><div><a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer nofollow ugc">${esc(a.title)}</a><span class="dom">${esc(hostOf(a.url))}</span>
+      ${a.note ? `<p class="small">${esc(a.note)}</p>` : ''}<p class="by">Shared by ${esc(a.by_name || 'someone')}${a.village ? ' of ' + esc(VN(a.village)) : ''}</p></div>
+      <div class="row"><button data-rec="${esc(String(a.id))}"${a.mine ? ' aria-pressed="true"' : ''}>Recommend · ${a.recs || 0}</button><button data-rep="${esc(String(a.id))}">Report</button></div></div>`
+          )
+          .join('')
+      : '<p class="small">The shelves are empty. Add the first article!</p>';
+  }
+  $('libX').addEventListener('click', () => ($('libM').hidden = true));
+  $('libList').addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const id = b.dataset.rec || b.dataset.rep,
+      kind = b.dataset.rec ? 'rec' : 'report',
+      a = ARTICLES.find(x => String(x.id) === id);
+    if (!a) return;
+    if (NET.ch) {
+      const { data, error } = await NET.sb.rpc('rate_article', { p_id: +id, p_kind: kind });
+      if (error) return toast(error.message);
+      toast(
+        kind === 'rec'
+          ? data.on
+            ? 'Recommended.'
+            : 'Recommendation taken back.'
+          : data.on
+            ? 'Reported. Thanks for keeping the shelves tidy.'
+            : 'Report taken back.'
+      );
+      return openLibrary();
+    }
+    if (kind === 'rec') {
+      a.mine = !a.mine;
+      a.recs = (a.recs || 0) + (a.mine ? 1 : -1);
+      ARTICLES.sort((x, y) => (y.recs || 0) - (x.recs || 0));
+    } else {
+      a.reports = (a.reports || 0) + 1;
+      toast('Reported. Thanks for keeping the shelves tidy.');
+      if (a.reports >= 3) a.hidden = true;
+    }
+    renderLibrary();
+  });
+  $('libAdd').addEventListener('click', async () => {
+    const title = $('libTitle').value.trim(),
+      url = $('libUrl').value.trim(),
+      note = $('libNote').value.trim();
+    if (title.length < 3) return toast('Give it a title of at least 3 characters.');
+    if (!safeUrl(url)) return toast('The link must start with https:// and have no spaces.');
+    if (NET.ch) {
+      const { error } = await NET.sb.rpc('add_article', { p_title: title, p_url: url, p_note: note });
+      if (error) return toast(error.message);
+    } else {
+      if (ARTICLES.some(a => a.url === url)) return toast('That article is already on the shelves.');
+      ARTICLES.unshift({
+        id: 'l' + Date.now(),
+        url,
+        title,
+        note,
+        by_name: player.display,
+        village: PAL.name,
+        recs: 0
+      });
+    }
+    $('libTitle').value = $('libUrl').value = $('libNote').value = '';
+    toast('Added to the shelves. Thanks for sharing!');
+    if (NET.ch) openLibrary();
+    else renderLibrary();
+  });
+
+  /* ---------- while you were away: what changed since you last looked ---------- */
+  const AWAYKEY = () => 'ideally-away-' + (NET.uid || 'solo');
+  let HIDDENSNAP = null;
+  function snapshot() {
+    if (!st.joined) return null;
+    const mp = myPlot();
+    return {
+      t: Date.now(),
+      time: ECO.time,
+      village: PAL.name,
+      home: st.homeV,
+      coins: st.coins,
+      savings: st.savings,
+      loan: st.loan,
+      grown: Math.floor(FARM.grown),
+      workers: FARM.workers,
+      horse: st.horse,
+      guard: st.guard,
+      plot: mp ? mp.idx : null,
+      weight: wOf(meKey()),
+      roles: myRoles(),
+      round: st.round,
+      news: (ECO.news[0] || {}).t || '',
+      jail: !!st.jail
+    };
+  }
+  function saveSnap() {
+    const sn = snapshot();
+    if (sn && NET.ch)
+      try {
+        localStorage.setItem(AWAYKEY(), JSON.stringify(sn));
+      } catch (e) {}
+  }
+  setInterval(saveSnap, 20000);
+  addEventListener('pagehide', saveSnap);
+  document.addEventListener('visibilitychange', () => {
+    if (!NET.ch) return; // in solo mode the world pauses while the tab is hidden
+    if (document.hidden) {
+      HIDDENSNAP = snapshot();
+      saveSnap();
+    } else if (HIDDENSNAP && Date.now() - HIDDENSNAP.t > 120000) {
+      const sn = HIDDENSNAP;
+      HIDDENSNAP = null;
+      setTimeout(async () => {
+        await netVillage();
+        await refreshMe();
+        showAway(sn);
+      }, 800);
+    }
+  });
+  function awayAfterJoin() {
+    if (!NET.ch) return;
+    let sn = null;
+    try {
+      sn = JSON.parse(localStorage.getItem(AWAYKEY()) || 'null');
+    } catch (e) {}
+    if (sn && sn.home === st.homeV && Date.now() - sn.t > 120000) setTimeout(() => showAway(sn), 2500);
+  }
+  function showAway(sn) {
+    if (!sn || !st.joined) return;
+    const L = [],
+      mins = Math.round((Date.now() - sn.t) / 60000),
+      days = Math.max(0, Math.floor(ECO.time / 1440) - Math.floor(sn.time / 1440));
+    const diff = (a, b, what) => {
+      if (a !== b) L.push(`${what}: ${a} → <b>${b}</b>`);
+    };
+    diff(sn.coins, st.coins, 'Coins');
+    diff(sn.savings, st.savings, 'Savings');
+    diff(sn.loan, st.loan, 'Loan');
+    if (FARM.workers < sn.workers)
+      L.push(
+        `${sn.workers - FARM.workers} farmhand${sn.workers - FARM.workers > 1 ? 's' : ''} quit because the wages couldn't be paid.`
+      );
+    if (Math.floor(FARM.grown) !== sn.grown)
+      L.push(`Your field: ${sn.grown} → <b>${Math.floor(FARM.grown)}</b> wheat.`);
+    if (sn.horse && !st.horse) L.push('Pip took your horse back: there was no money for its feed.');
+    if (sn.guard && !st.guard) L.push('The knight guarding your field went home: his fee went unpaid.');
+    const mp = myPlot();
+    if (sn.plot != null && !mp) L.push('You no longer own your plot on the Housing Lane.');
+    const w = wOf(meKey());
+    if (w !== sn.weight)
+      L.push(`The village changed your vote: it now counts as <b>${fmtW(w)}</b> (was ${fmtW(sn.weight)}).`);
+    const now = myRoles();
+    for (const r of now) if (!sn.roles.includes(r)) L.push(`You were elected <b>${esc(roleTitle(r))}</b>!`);
+    for (const r of sn.roles) if (!now.includes(r)) L.push(`You are no longer the ${esc(roleTitle(r))}.`);
+    const meets = st.log.filter(l => typeof l.r === 'number' && l.r >= sn.round);
+    for (const l of meets.slice(0, 3)) {
+      const passed = l.m.filter(x => /: passed \(/.test(x)).map(x => x.split(': passed')[0]);
+      L.push(
+        `Town meeting${typeof l.r === 'number' ? ' (round ' + l.r + ')' : ''}: ${passed.length ? 'passed ' + passed.map(esc).join('; ') : 'nothing passed'}.${(l.b || []).length ? ` <button class="primary" data-awaymeet="${l.r}">See the results and the battle</button>` : ''}`
+      );
+    }
+    const fresh = [];
+    for (const n of ECO.news) {
+      if (n.t === sn.news) break;
+      fresh.push(n.t);
+    }
+    for (const t of fresh.slice(0, 4)) L.push(esc(t));
+    if (st.jail && !sn.jail) L.push('<b>You are in the cells.</b> Your trial is at the town hall.');
+    if (!L.length) L.push('All quiet. Nothing much changed while you were gone.');
+    $('awWhen').textContent =
+      `You were away for ${mins < 60 ? mins + (mins === 1 ? ' minute' : ' minutes') : (h => h + (h === 1 ? ' hour' : ' hours'))(Math.round(mins / 6) / 10)}${days ? ` (${days} game day${days > 1 ? 's' : ''})` : ''}.`;
+    $('awList').innerHTML = L.map(x => `<li>${x}</li>`).join('');
+    $('awayM').hidden = false;
+    $('awX').focus({ preventScroll: true });
+  }
+  $('awX').addEventListener('click', () => ($('awayM').hidden = true));
+  $('awList').addEventListener('click', e => {
+    const b = e.target.closest('[data-awaymeet]');
+    if (!b) return;
+    const l = st.log.find(x => String(x.r) === b.dataset.awaymeet);
+    if (!l) return;
+    $('awayM').hidden = true;
+    showScroll(l.m, l.b);
+  });
 
   /* ---------- fishing ---------- */
   let fish = null;
@@ -5529,6 +5798,7 @@
               label: myPlot() ? 'The Lodgings' : 'Go to your room at the Lodgings',
               fn: () => enter(b)
             };
+          if (b.library) return { label: 'Browse the library', fn: openLibrary };
           if (o)
             return {
               label:
@@ -5886,6 +6156,11 @@
       return;
     }
     if (e.key === 'Escape') {
+      for (const id of ['legalM', 'libM', 'awayM'])
+        if (!$(id).hidden) {
+          $(id).hidden = true;
+          return;
+        }
       if (!$('ed').hidden) closeEd();
       else if (!$('acctM').hidden) $('acctM').hidden = true;
       else if (!$('crime').hidden) $('crime').hidden = true;
@@ -6423,6 +6698,16 @@
     const S2 = VS();
     if (b.lodge) {
       bldBase(Object.assign({}, b, { roof: shade(PAL.hall, 20), wall: S2.walls[0] }));
+      return;
+    }
+    if (b.library) {
+      bldBase(Object.assign({}, b, { roof: '#4a3a6a', wall: S2.walls[S2.walls.length - 1] }));
+      const X = b.x * T + b.w * T - 22,
+        Y = (b.y + b.h) * T - 30;
+      R('#6b4226', X, Y, 16, 12);
+      R('#c8434b', X + 2, Y + 2, 3, 8);
+      R('#3a7ab0', X + 6, Y + 2, 3, 8);
+      R('#f2c23a', X + 10, Y + 2, 3, 8);
       return;
     }
     const o = plotOf(b.idx);
@@ -7110,11 +7395,13 @@
         txt(
           b.lodge
             ? 'The Lodgings'
-            : o
-              ? mine
-                ? 'Your house'
-                : `${o.name}'s house`
-              : `Plot for sale · ${PLOTPRICE}`,
+            : b.library
+              ? 'Library'
+              : o
+                ? mine
+                  ? 'Your house'
+                  : `${o.name}'s house`
+                : `Plot for sale · ${PLOTPRICE}`,
           SX((b.x + b.w / 2) * T),
           SY(b.y * T - 3),
           13,
