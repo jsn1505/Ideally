@@ -1383,3 +1383,75 @@ body.landing-on .bar {
     transition: none;
   }
 }
+
+/* library, away summary, legal */
+.card.wide {
+  width: min(720px, 94vw);
+}
+.artlist {
+  display: grid;
+  gap: 8px;
+  max-height: 44vh;
+  overflow: auto;
+  margin: 8px 0;
+}
+.art {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.art a {
+  font-weight: 800;
+  color: inherit;
+}
+.art .dom {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 6px;
+}
+.art p {
+  margin: 4px 0 0;
+}
+.art .row {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.art button {
+  min-height: 34px;
+  font-size: 13px;
+}
+.awlist {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.awlist li {
+  line-height: 1.4;
+}
+.legal {
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.legalnote {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 6px;
+}
+.legalnote a {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#legalM {
+  z-index: 60;
+}
