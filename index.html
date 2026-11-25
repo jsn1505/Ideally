@@ -246,6 +246,9 @@ body.landing-on .bar{display:none}
   <div class="card"><h2 id="bH">Village bank</h2><div id="bBody"></div><div class="row"><button id="bx">Close</button></div></div>
  </div>
 
+ <div id="postM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="pH">
+  <div class="card"><h2 id="pH">Knight post</h2><p class="small">Sempaladom's knights keep the peace in every village. The cells are just south of here.</p><div id="pBody"></div><div class="row"><button id="px">Close</button></div></div>
+ </div>
  <div id="travel" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="tH">
   <div class="card"><h2 id="tH">The road out of the village</h2><p class="small" id="tInfo"></p><div id="tBody" class="tlist"></div><div class="row"><button id="tx">Stay here</button></div></div>
  </div>
@@ -344,6 +347,7 @@ const VILLAGES=[
 ];
 let PAL=VILLAGES[0],RIVAL='Ye Old Town';
 const DISP={};const VN=n=>DISP[n]||n;
+let MEETF=null,MEETNOTE=-1,MEETRES=null,MEETLINE=0;
 // where you live vs where you are: visitors can walk, chat and fish, but only locals trade, bank and vote
 const visiting=()=>st.joined&&!!st.homeV&&PAL.name!==st.homeV;
 function setVilLabel(){const h=document.getElementById('hVil');if(h)h.textContent=visiting()?`${VN(PAL.name)} (visiting)`:VN(PAL.name)}
@@ -384,9 +388,9 @@ const scoreWord=sc=>sc>=700?'Excellent':sc>=600?'Good':sc>=500?'Fair':'Poor';
 
 /* ---------- game state ---------- */
 const FISH=[{n:'Minnow',v:2,w:40,c:'#b8c4cc'},{n:'Perch',v:5,w:30,c:'#9bbf4a'},{n:'Trout',v:9,w:18,c:'#d98aa0'},{n:'Pike',v:16,w:9,c:'#6b8f5a'},{n:'Golden carp',v:45,w:3,c:'#f2c23a'}];
-const PRICE={house:60,char:30,building:0,bait:12,horse:150,feed:3};
+const PRICE={house:60,char:30,building:0,bait:12,horse:150,feed:3,guard:8};
 const PETS=[{k:'cat',n:'Cat',p:40},{k:'dog',n:'Dog',p:50},{k:'chicken',n:'Chicken',p:25}];
-const st={homeV:null,mem:{},wantedBy:{},savings:0,loan:0,repaid:0,defaults:0,insured:false,coins:40,bag:{},bait:0,treasury:100,tax:5,round:1,online:0,drift:0,lanterns:false,log:[],props:[],trials:[],weights:{},goodwill:0,builds:[],ledger:[],taxAcc:0,horse:false,pet:null,jail:null,joined:false};
+const st={guard:false,homeV:null,mem:{},wantedBy:{},savings:0,loan:0,repaid:0,defaults:0,insured:false,coins:40,bag:{},bait:0,treasury:100,tax:5,round:1,online:0,drift:0,lanterns:false,log:[],props:[],trials:[],weights:{},goodwill:0,builds:[],ledger:[],taxAcc:0,horse:false,pet:null,jail:null,joined:false};
 const bagCount=()=>Object.values(st.bag).reduce((a,b)=>a+b,0);
 
 /* ---------- economy: a self-balancing market ---------- */
@@ -451,6 +455,8 @@ function personalDay(){
   if(st.coins>=cost){st.coins-=cost;toast(`Midnight: you paid your ${FARM.workers} farmhand${FARM.workers>1?'s':''} ${cost} coins (${w} each).`)}
   else{const keep=Math.floor(st.coins/w),gone=FARM.workers-keep;FARM.workers=keep;st.coins-=keep*w;mev('hire',-gone,0);toast(`You couldn't cover wages of ${w} each, so ${gone} farmhand${gone>1?'s':''} quit.`)}}
  if(st.horse){if(st.coins>=PRICE.feed){st.coins-=PRICE.feed}else{st.horse=false;toast('You could not afford feed, so Pip took your horse back.')}}
+ if(st.guard){if(st.coins>=PRICE.guard)st.coins-=PRICE.guard;else{st.guard=false;toast('You could not pay the knight guarding your field, so he went back to Sempaladom.')}}
+ else if(FARM.grown>=10&&Math.random()<.2){const lost=Math.floor(FARM.grown*.3);FARM.grown-=lost;toast(`Thieves raided your field in the night and took ${lost} wheat. A knight from the knight post would have stopped them.`)}
  bankDay();
  if(RULE().dividend){if(NET.ch)NET.sb.rpc('claim_dividend').then(({data})=>{if(data>0){st.coins+=data;hud();saveProfile();toast(`The commune paid your daily share: ${data} coins.`)}});
   else{const a=Math.min(20,Math.floor(st.treasury*.01));if(a>0){st.treasury-=a;st.coins+=a;toast(`The commune paid your daily share: ${a} coins.`)}}}
@@ -490,26 +496,40 @@ const B=[
 const HOME=B[4];
 // empty plots where player-designed buildings go once the village approves them
 const DPLOTS=[{x:34,y:3,w:4,h:3},{x:22,y:24,w:4,h:3}];
-const CELL={x:2,y:18,w:3,h:3};
-{
- const v=village,t=v.tiles,keep=grid(VW,VH,false);
+const CELL={x:2,y:18,w:3,h:3},WB={x:6,y:15};
+// every village has its own layout: where the buildings, lake, square, farm and roads are
+// B order: town hall, Mira, Tobi, Juno, your house, architect, pub, bank, knight post
+const LAYOUTS={"Sempaladom":{"R":14,"fire":[20,15],"mkt":[15,15],"lake":[29,15,11,10,34,20.5,3.4,2.4],"stall":[32,15],"farm":[8,24],"stable":[26,15],"B":[[16,3],[5,8],[31,8],[5,18],[11,18],[25,8],[24,18],[11,9],[2,15]],"plots":[[34,3],[22,24]],"paths":[[20,9,20,22],[7,12,7,14],[33,12,33,14],[26,12,26,14],[7,22,28,23],[12,12,12,13],[3,14,3,14]],"trees":1,"seed":0},"Ye Old Town":{"R":12,"fire":[20,17],"mkt":[15,17],"lake":[1,14,12,11,6.5,20,4,2.8],"stall":[9,14],"farm":[24,24],"stable":[31,15],"B":[[3,3],[14,4],[22,4],[17,21],[11,21],[30,4],[25,18],[35,5],[34,13]],"plots":[[33,20],[26,14]],"paths":[[7,9,7,11],[16,8,16,11],[24,8,24,11],[31,8,31,11],[36,8,36,11],[20,13,20,14],[13,25,30,25],[19,20,19,24],[28,22,28,24],[35,15,35,15]],"trees":1.4,"seed":97},"Comradesbury":{"R":9,"fire":[20,14],"mkt":[15,13],"lake":[1,19,13,8,6.5,23.5,5,2.6],"stall":[10,17],"farm":[25,24],"stable":[31,4],"B":[[15,2],[3,11],[9,11],[27,11],[33,11],[26,3],[17,19],[9,4],[2,3]],"plots":[[29,18],[34,18]],"paths":[[20,10,20,10],[2,16,38,16],[23,17,23,22],[20,23,23,24],[13,17,13,18],[10,7,10,8],[27,7,27,8],[19,8,19,8],[24,23,30,23]],"trees":0.5,"seed":194},"Elsegoodom":{"R":10,"fire":[20,14],"mkt":[25,13],"lake":[0,21,40,6,20,25.5,18,3.4],"stall":[14,17],"farm":[2,12],"stable":[28,13],"B":[[16,2],[3,4],[27,4],[3,16],[9,16],[10,4],[25,16],[34,5],[33,12]],"plots":[[34,1],[21,17]],"paths":[[5,8,5,9],[11,8,11,9],[20,8,20,9],[29,8,29,9],[35,8,35,9],[2,20,38,20],[19,17,19,19],[15,19,15,19],[8,11,8,11],[32,11,32,14]],"trees":0.7,"seed":291},"Goatedom":{"R":20,"fire":[12,13],"mkt":[17,13],"lake":[26,1,13,10,32.5,5.5,5,3],"stall":[25,8],"farm":[23,22],"stable":[19,14],"B":[[3,2],[14,3],[27,13],[33,13],[3,22],[20,4],[10,22],[17,22],[2,14]],"plots":[[35,23],[9,16]],"paths":[[7,8,7,19],[16,8,16,19],[21,8,21,19],[29,17,29,19],[35,17,35,19],[2,26,20,26],[8,21,8,25],[18,25,18,26],[28,21,28,21],[25,10,25,19],[26,10,26,10]],"trees":1.3,"seed":388}};
+const DOFF=[4,2,2,2,2,1,3,1,1];
+let LY=LAYOUTS.Sempaladom;
+const SPAWN=()=>({x:LY.fire[0]*T+8,y:(LY.fire[1]+3)*T+12});
+function buildVillage(name,init){const l=LY=LAYOUTS[name]||LAYOUTS.Sempaladom,v=village;
+ const sat=init?[]:chars.filter(c=>c.scene==='village'&&c.sit&&!c.meeting).map(c=>[c,v.seats.indexOf(c.sit)]);
+ B.forEach((b,i)=>{b.x=l.B[i][0];b.y=l.B[i][1];b.door=b.x+DOFF[i]});
+ DPLOTS.forEach((p,i)=>{p.x=l.plots[i][0];p.y=l.plots[i][1]});
+ const K=l.B[8];CELL.x=K[0];CELL.y=K[1]+3;WB.x=K[0]+4;WB.y=K[1];
+ v.tiles=grid(VW,VH,0);v.solid=grid(VW,VH,false);v.objs=[];v.seats=[];
+ const t=v.tiles,keep=grid(VW,VH,false);
  const rect=(x0,y0,w,h,fn)=>{for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++)if(x>=0&&y>=0&&x<VW&&y<VH)fn(x,y)};
  const path=(x0,y0,x1,y1)=>rect(x0,y0,x1-x0+1,y1-y0+1,(x,y)=>{t[y][x]=1;keep[y][x]=true});
- path(2,14,38,14);path(20,9,20,22);path(16,12,24,17);path(7,12,7,14);path(33,12,33,14);path(26,12,26,14);path(7,22,28,23);path(12,12,12,13);path(3,14,3,14);
- rect(29,15,11,10,(x,y)=>{keep[y][x]=true;if(((x-34)/3.4)**2+((y-20.5)/2.4)**2<1){t[y][x]=2;v.solid[y][x]=true}});
- for(const b of B){rect(b.x-1,b.y-1,b.w+2,b.h+2,(x,y)=>keep[y][x]=true);rect(b.x,b.y,b.w,b.h,(x,y)=>v.solid[y][x]=true)}
+ const [fx,fy]=l.fire,R=l.R;
+ path(2,R,38,R);for(const q of l.paths)path(...q);path(fx-4,fy-3,fx+4,fy+2);
+ const [lx,ly,lw,lh,cx,cy,rx,ry]=l.lake;rect(lx,ly,lw,lh,(x,y)=>{keep[y][x]=true;if(((x-cx)/rx)**2+((y-cy)/ry)**2<1){t[y][x]=2;v.solid[y][x]=true}});
+ for(const b of B){rect(b.x-1,b.y-1,b.w+2,b.h+2,(x,y)=>keep[y][x]=true);rect(b.x,b.y,b.w,b.h,(x,y)=>v.solid[y][x]=true);path(b.door,b.y+b.h,b.door,b.y+b.h)}
  for(const p of DPLOTS){rect(p.x-1,p.y-1,p.w+2,p.h+2,(x,y)=>keep[y][x]=true);rect(p.x,p.y,p.w,p.h,(x,y)=>t[y][x]=5)}
- rect(1,14,4,8,(x,y)=>keep[y][x]=true);rect(5,14,3,3,(x,y)=>keep[y][x]=true);rect(25,14,4,5,(x,y)=>keep[y][x]=true);
- rect(15,11,11,8,(x,y)=>keep[y][x]=true);
- rect(7,24,14,3,(x,y)=>{keep[y][x]=true;if(x>=8&&x<=19)t[y][x]=6});
+ rect(K[0]-1,K[1]-1,5,8,(x,y)=>keep[y][x]=true);rect(K[0]+3,K[1]-1,3,3,(x,y)=>keep[y][x]=true);
+ const [sx,sy]=l.stable;rect(sx-1,sy-1,4,5,(x,y)=>keep[y][x]=true);
+ rect(fx-5,fy-4,11,8,(x,y)=>keep[y][x]=true);
+ const [Fx,Fy]=l.farm;rect(Fx-1,Fy,14,3,(x,y)=>{keep[y][x]=true;if(x>=Fx&&x<=Fx+11)t[y][x]=6});
  for(let y=0;y<VH;y++)for(let x=0;x<VW;x++){
-  const edge=x===0||y===0||x===VW-1||y===VH-1,h=hash(x,y);
-  if(edge||(!keep[y][x]&&t[y][x]===0&&(((x<2||y<2||x>VW-3||y>VH-3)&&h<.65)||h<.06))){t[y][x]=3;v.solid[y][x]=true}
+  const edge=x===0||y===0||x===VW-1||y===VH-1,h=hash(x+l.seed,y);
+  if(edge||(!keep[y][x]&&t[y][x]===0&&(((x<2||y<2||x>VW-3||y>VH-3)&&h<.65)||h<.06*l.trees))){t[y][x]=3;v.solid[y][x]=true}
   else if(!keep[y][x]&&t[y][x]===0&&h<.14)t[y][x]=4;
  }
- obj(v,'fire',20,15,1,1,true);obj(v,'wanted',6,15,1,1,true);obj(v,'sign',38,13,1,1,false);obj(v,'fishstall',32,15,3,2,true);obj(v,'hireboard',7,24,1,1,true);obj(v,'mktboard',15,15,1,1,true);obj(v,'stable',26,15,2,2,true);obj(v,'cell',2,18,3,3,false);
- seat(v,18,14,'log',3);seat(v,18,16,'log',3);seat(v,22,14,'log',2);seat(v,22,16,'log',2);
-}
+ obj(v,'fire',fx,fy,1,1,true);obj(v,'wanted',WB.x,WB.y,1,1,true);obj(v,'sign',38,R-1,1,1,false);obj(v,'fishstall',l.stall[0],l.stall[1],3,2,true);obj(v,'hireboard',Fx-1,Fy,1,1,true);obj(v,'mktboard',l.mkt[0],l.mkt[1],1,1,true);obj(v,'stable',sx,sy,2,2,true);obj(v,'cell',CELL.x,CELL.y,3,3,false);
+ seat(v,fx-2,fy-1,'log',3);seat(v,fx-2,fy+1,'log',3);seat(v,fx+2,fy-1,'log',2);seat(v,fx+2,fy+1,'log',2);
+ if(!init){endAllMeet();for(const [c,i] of sat){c.sit=null;if(i>=0&&v.seats[i])sitAt(c,v.seats[i])}placeNPCs()}}
+buildVillage('Sempaladom',true);
 function mkRoom(key,label,w,h,o){const s=mkScene(key,label,w,h,10);Object.assign(s,o);s.exitX=Math.floor(w/2);
  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(y<2||x===0||x===w-1||y===h-1){s.tiles[y][x]=11;s.solid[y][x]=true}
  s.tiles[h-1][s.exitX]=12;s.solid[h-1][s.exitX]=false;return s}
@@ -547,15 +567,21 @@ npc('Tobi','#f2a03d','#7a3b12',skins[0],'tobi',0);npc('Juno','#8a5ad6','#d9b45a'
 npc('Ana','#c0569a','#1a1a1a',skins[2],'village',0);const rex=npc('Rex','#3fa36b','#8a5a2a',skins[0],'village',3);
 npc('Mayor Odo','#6b4fa0','#d8d8d8',skins[1],'hall',4);
 const lu=npc('Lu','#e07b39','#2a1a10',skins[4],'village',null);Object.assign(lu,{x:14*T,y:14*T+12,wander:true});
+for(const [n,col,hair,sk] of [['Odette','#b05a8a','#2a1a10',1],['Bram','#5a7a3a','#7a3b12',0],['Sela','#3a7ab0','#d9b45a',4],['Finn','#c8843a','#a0522d',2],['Wren','#7a5ab0','#1a1a1a',3]]){const c=npc(n,col,hair,skins[sk],'village',null);Object.assign(c,{x:20*T,y:18*T,wander:true})}
 const marlo=npc('Marlo','#2f7fb8','#6b4a2a',skins[2],'village',null);Object.assign(marlo,{x:33.5*T,y:17*T+12,shop:'marlo'});
 const vera=npc('Vera','#e8823a','#2a1a10',skins[3],'village',null);Object.assign(vera,{x:28*T+8,y:12*T+12,shop:'vera'});
 const hilda=npc('Hilda','#7a3b5a','#c87a2a',skins[4],'tavern',null);Object.assign(hilda,{x:10.5*T,y:2*T+4,shop:'hilda'});
 const pip=npc('Pip','#e8c547','#5a3a1a',skins[3],'village',null);Object.assign(pip,{x:27*T,y:17*T+12,shop:'pip'});
 // Sempaladom's knights: not villagers, so they never vote
 const POST={x:3*T+8,y:17*T+12};
+function placeNPCs(){const l=LY,a=B[5];POST.x=(l.B[8][0]+1)*T+8;POST.y=(l.B[8][1]+2)*T+12;
+ Object.assign(marlo,{x:(l.stall[0]+1.5)*T,y:(l.stall[1]+2)*T+12});Object.assign(vera,{x:(a.x+3)*T+8,y:(a.y+4)*T+12});Object.assign(pip,{x:(l.stable[0]+1)*T,y:(l.stable[1]+2)*T+12});
+ if(typeof knightA!=='undefined'){Object.assign(knightA,{x:POST.x+16,y:POST.y,home:{x:POST.x+16,y:POST.y}});Object.assign(knightB,{x:10*T,y:l.R*T+12})}
+ for(const c of chars)if(c.wander&&c.scene==='village'){const sp=SPAWN();c.x=sp.x-24+Math.random()*48;c.y=sp.y-8;c.tx=null}}
 const knightA=npc('Sir Aldric','#9aa4ad','#7d858c',skins[0],'village',null);Object.assign(knightA,{x:POST.x+16,y:POST.y,knight:true,home:{x:POST.x+16,y:POST.y}});
 for(let i=0;i<36;i++)hourTick(true);
 const knightB=npc('Dame Wynn','#9aa4ad','#7d858c',skins[2],'village',null);Object.assign(knightB,{x:10*T,y:14*T+12,knight:true,patrol:1});
+placeNPCs();
 
 /* ---------- village chat ---------- */
 const LINES={
@@ -644,13 +670,13 @@ function resolveTrial(t){const sc=trialScores(t);let bi=0;sc.forEach((v,i)=>{if(
 function applyMyVerdict(g,name){let m='';
  if(g.k==='fine'){const paid=Math.min(st.coins,g.a);st.coins-=paid;if(NET.ch)mev('fine',1,paid);else{st.treasury+=paid;ledger(`Fine paid by ${name}`,paid)}st.jail=null;release();m=` You paid ${paid} coins.`}
  else if(g.k==='jail'){st.jail={until:ECO.time+g.h*60};m=' Back to your cell.'}
- else if(g.k==='exec'){st.coins=0;st.bag={};st.jail=null;player.scene='village';player.x=20*T+8;player.y=19*T+12;FARM.grown=0;m=' You respawn in the square with empty pockets.'}
+ else if(g.k==='exec'){st.coins=0;st.bag={};st.jail=null;player.scene='village';{const sp=SPAWN();player.x=sp.x;player.y=sp.y}FARM.grown=0;m=' You respawn in the square with empty pockets.'}
  else{st.jail=null;release()}
  hud();saveProfile();return m}
 function ledger(t,amt){st.ledger.unshift({d:dayNum(),t,amt});if(st.ledger.length>12)st.ledger.pop()}
-function release(){player.x=3*T+8;player.y=17*T+14;player.scene='village';toast('You are free to go.')}
+function release(){player.x=POST.x;player.y=POST.y+2;player.scene='village';toast('You are free to go.')}
 function jailNpc(c){if(c.sit){c.prevSeat=c.sit;c.sit.who=null;c.sit=null}c.prev={scene:c.scene,x:c.x,y:c.y,wander:c.wander};c.wander=false;c.scene='village';c.jailed=true;c.x=CELL.x*T+20+Math.random()*12;c.y=(CELL.y+2)*T+4}
-function freeNpc(c){if(!c.jailed&&!c.gone)return;c.jailed=false;c.gone=0;c.jailUntil=0;const p=c.prev||{scene:'village',x:20*T,y:19*T};c.scene=p.scene;c.x=p.x;c.y=p.y;c.wander=p.wander;if(c.prevSeat&&!c.prevSeat.who)sitAt(c,c.prevSeat)}
+function freeNpc(c){if(!c.jailed&&!c.gone)return;c.jailed=false;c.gone=0;c.jailUntil=0;const p=c.prev||Object.assign({scene:'village'},SPAWN());c.scene=p.scene;c.x=p.x;c.y=p.y;c.wander=p.wander;if(c.prevSeat&&!c.prevSeat.who)sitAt(c,c.prevSeat)}
 function npcCrime(){const pool=chars.filter(c=>!c.isP&&!c.remote&&!c.knight&&!c.shop&&!c.jailed&&!c.gone&&c.name!=='Mayor Odo');if(!pool.length)return;const c=pick(pool),cr=pick(['pickpocketing','starting a fight']);jailNpc(c);startTrial(c.name,cr);return `${c.name} was arrested by the knights for ${cr}. The trial is at the town hall.`}
 function renderVote(){$('vlaw').innerHTML=`<b>Village law:</b> ${esc(RULE().rule||'')}`;$('vW').textContent=fmtW(wOf(meKey()));$('vRound').textContent=st.round;
  {const fr=visiting()?[]:voters().filter(n=>loyOf(n)>=15),fo=visiting()?[]:voters().filter(n=>loyOf(n)<=-15);
@@ -709,14 +735,13 @@ function apply(p,m){
  else if(p.kind==='raid'){if(Math.random()<.55){st.treasury+=50;ledger(`Raid on ${VN(RIVAL)}`,50);m.push(`The raid on ${VN(RIVAL)} worked: +50 gold.`)}else{st.treasury=Math.max(0,st.treasury-30);ledger(`Failed raid on ${VN(RIVAL)}`,-30);m.push(`${VN(RIVAL)} fought back: -30 gold.`)}}
  else if(p.kind==='weight'){const w=Math.min(1,Math.max(.5,wOf(p.data.who)+.25*p.data.dir));st.weights[p.data.who]=w;m.push(`${p.data.who==='You'?player.display:p.data.who}'s vote is now ${fmtW(w)}.`)}
  else if(p.kind==='build'){if(p.cost>st.treasury){m.push(`"${p.data.name}" passed, but the treasury only had ${st.treasury} gold.`);return}if(!placeBuild(p)){m.push(`"${p.data.name}" passed, but there is no free plot left.`);return}st.treasury-=p.cost;ledger(`Built "${p.data.name}"`,-p.cost);m.push(`"${p.data.name}" has been built.`)}}
-$('closeVote').addEventListener('click',async()=>{
- if(NET.ch){const {data,error}=await NET.sb.rpc('count_votes');if(error){toast(error.message);return}toast((data||[]).slice(0,2).join(' '));await netVillage();await loadHall();return}
- const m=[];
+function countVotes(){const m=[];
  if(!st.props.length)m.push('There was nothing to vote on.');
  for(const p of st.props){const {y,n}=tally(p),pass=y>n;m.push(`${p.title}: ${pass?'passed':'rejected'} (${fmtW(y)} to ${fmtW(n)}).`);if(pass)apply(p,m)}
  if(Math.random()<.25){st.treasury=Math.max(0,st.treasury-20);ledger(`${VN(RIVAL)} raided us`,-20);m.push(`Overnight, ${VN(RIVAL)} raided us and took 20 gold.`)}
- st.log.unshift({r:st.round,m});st.round++;seedProps();renderVote();hud();toast(m.slice(0,2).join(' '))});
-function voteTimer(){const b=$('closeVote');if(!NET.ch||!st.roundEnds){b.textContent='Count the votes';return}const ms=st.roundEnds-Date.now();b.textContent=ms>0?`Voting closes in ${Math.floor(ms/60000)}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`:'Count the votes'}
+ st.log.unshift({r:st.round,m});st.round++;seedProps();if(!$('vote').hidden)renderVote();hud();meetingResults(m)}
+$('closeVote').addEventListener('click',()=>toast(`Votes are counted at the town meeting on Day ${Math.floor(nextMeetT()/1440)+1} at 18:00. Every villager turns up.`));
+function voteTimer(){const b=$('closeVote'),ph=meetPhase();b.textContent=ph==='meet'?'The town meeting is on now!':ph==='gather'?'Town meeting today at 18:00':`Next town meeting: Day ${Math.floor(nextMeetT()/1440)+1} at 18:00`}
 setInterval(()=>{if(!$('vote').hidden)voteTimer()},1000);
 function openVote(){for(const k in K)K[k]=0;$('vote').hidden=false;renderVote();voteTimer();$('closeVote').focus({preventScroll:true})}
 function closeVote(){$('vote').hidden=true}
@@ -753,12 +778,24 @@ $('bx').addEventListener('click',()=>$('bank').hidden=true);
 
 /* ---------- crime ---------- */
 const crimeTarget=()=>{if(player.scene==='gone'||st.jail||player.sit)return null;let best=null,bd=24;for(const c of chars){if(c.isP||c.remote||c.knight||c.jailed||c.gone||c.scene!==player.scene||c.ko>performance.now())continue;const d=Math.hypot(c.x-player.x,c.y-player.y);if(d<bd){bd=d;best=c}}return best};
-function openCrime(){if(visiting()){if(crimeTarget())toast(`You're a guest in ${VN(PAL.name)}. Keep your hands to yourself.`);return}const c=crimeTarget();if(!c||modalOpen())return;for(const k in K)K[k]=0;
+const nearFields=()=>{if(player.scene!=='village'||st.jail||player.sit)return false;const [Fx,Fy]=LY.farm,px=player.x/T,py=player.y/T;
+ if(px<Fx-.3||px>Fx+12.3||py<Fy-.6||py>Fy+3.6)return false;return visiting()||px>=Fx+4};
+function openCrime(){if(modalOpen())return;const f=nearFields();let c=crimeTarget();
+ if(visiting()&&c&&!f){toast(`You're a guest in ${VN(PAL.name)}. Keep your hands off the people here.`);return}
+ if(visiting())c=null;if(!c&&!f)return;for(const k in K)K[k]=0;
  const kn=Math.min(...[knightA,knightB].filter(k=>k.scene===player.scene).map(k=>Math.hypot(k.x-player.x,k.y-player.y)),9999)/T;
- $('qBody').innerHTML=`<p>${kn<10?'<b class="down">A knight is close by.</b> ':''}What do you want to do to <b>${esc(c.name)}</b>?</p><div class="row" style="margin-top:6px"><button class="primary" data-crime="pick">Pickpocket ${esc(c.name)}</button><button data-crime="fight">Pick a fight</button></div>`;
- $('qBody').dataset.who=c.name;$('crime').hidden=false;$('qx').focus({preventScroll:true})}
-$('qBody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const c=chars.find(x=>x.name===$('qBody').dataset.who);$('crime').hidden=true;if(c)doCrime(b.dataset.crime,c)});
+ $('qBody').innerHTML=`<p>${kn<10?'<b class="down">A knight is close by.</b> ':''}What are you up to?</p><div class="row" style="margin-top:6px">${c?`<button class="primary" data-crime="pick">Pickpocket ${esc(c.name)}</button><button data-crime="fight">Pick a fight with ${esc(c.name)}</button>`:''}${f?`<button ${c?'':'class="primary"'} data-crime="crops">Steal some crops from the ${visiting()?'local farm':'fields'}</button>`:''}</div>`;
+ $('qBody').dataset.who=c?c.name:'';$('crime').hidden=false;$('qx').focus({preventScroll:true})}
+$('qBody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$('crime').hidden=true;if(b.dataset.crime==='crops'){stealCrops();return}const c=chars.find(x=>x.name===$('qBody').dataset.who);if(c)doCrime(b.dataset.crime,c)});
 $('qx').addEventListener('click',()=>$('crime').hidden=true);
+async function stealCrops(){const near=[knightA,knightB].some(k=>k.scene===player.scene&&Math.hypot(k.x-player.x,k.y-player.y)<8*T);
+ if(NET.ch){const r=await srv('crop_steal',{p_village:PAL.name,p_near:near});if(!r)return;
+  toast(r.guarded?`A knight was guarding ${r.from}! You got nothing.`:`You stuffed ${r.got} wheat from ${r.from} into your bag.`);if(r.caught)arrest(r.crime);return}
+ const guarded=visiting()&&Math.random()<.3,got=guarded?0:4+Math.floor(Math.random()*7),from=visiting()?'a local farm':'the village farms';
+ if(got){st.bag.Wheat=(st.bag.Wheat||0)+got;MK.wheat.stock=Math.max(30,MK.wheat.stock-got)}
+ if(!visiting())like(voters(),-3);
+ const caught=guarded?Math.random()<.85:Math.random()<.35+(near?.45:0)+(PAL.name==='Sempaladom'?.15:0);
+ toast(guarded?`A knight was guarding ${from}! You got nothing.`:`You stuffed ${got} wheat from ${from} into your bag.`);hud();saveProfile();if(caught)arrest(`stealing crops from ${from}`)}
 async function doCrime(kind,c){const now=performance.now(),near=[knightA,knightB].some(k=>k.scene===player.scene&&Math.hypot(k.x-player.x,k.y-player.y)<8*T);
  if(NET.ch){const r=await srv('crime',{p_kind:kind,p_target:c.name,p_near:near,p_inside:player.scene!=='village'});if(!r)return;
   if(kind==='pick'){if(r.ok&&r.got){toast(`You lifted ${r.got} coins from ${c.name}.`)}else{c.bubble='Hey! Hands off!';c.bt=now+3000;toast(`${c.name} felt your hand and pulled away.`)}}
@@ -913,13 +950,13 @@ if(NET.on){try{NET.sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseA
  NET.lobby.on('presence',{event:'sync'},()=>{const c={};for(const arr of Object.values(NET.lobby.presenceState()))for(const p of arr)if(p.village)c[p.village]=(c[p.village]||0)+1;NET.counts=c;if(!$('join').hidden&&!joining)renderJoin()})
   .subscribe(s=>{if(s==='SUBSCRIBED')NET.lobby.track({village:null})})}catch(e){console.warn(e);NET.on=false}}
 const countOf=v=>NET.on?(NET.counts[v.name]||0):v.online;
-function renderJoin(){$('vlist').innerHTML=VILLAGES.map((v,i)=>{const n=countOf(v),full=n>=MAXP;return `<button class="vcard" data-v="${i}" ${full?'disabled':''}><b>${esc(VN(v.name))}</b><span class="sw">${[v.hall].concat(v.roofs.slice(0,4)).map(c=>`<i style="background:${c}"></i>`).join('')}<i style="background:${v.grass[0]}"></i></span><p>${v.blurb}</p><div class="meter"><i style="width:${n/MAXP*100}%"></i></div><span class="meta"><span class="${full?'full':''}">${full?'Full':''} ${n}/${MAXP} players</span><span>13 villagers</span></span></button>`}).join('');
+function renderJoin(){$('vlist').innerHTML=VILLAGES.map((v,i)=>{const n=countOf(v),full=n>=MAXP;return `<button class="vcard" data-v="${i}" ${full?'disabled':''}><b>${esc(VN(v.name))}</b><span class="sw">${[v.hall].concat(v.roofs.slice(0,4)).map(c=>`<i style="background:${c}"></i>`).join('')}<i style="background:${v.grass[0]}"></i></span><p>${v.blurb}</p><div class="meter"><i style="width:${n/MAXP*100}%"></i></div><span class="meta"><span class="${full?'full':''}">${full?'Full':''} ${n}/${MAXP} players</span><span>${voters().length} villagers</span></span></button>`}).join('');
  $('jMode').textContent=NET.on?'Online: you will meet real players. Votes, public chat, coins and designs are saved.':'Solo prototype: other players and villages are simulated and nothing is saved. Add your Supabase keys to config.js to play online.'}
 let joining=false;
 $('vlist').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled)joinVillage(VILLAGES[+b.dataset.v])});
 // hovering a village paints the scene behind in its colours
 let previewI=0,previewHold=false;
-function paintVillage(v){PAL=v;const S=VS();
+function paintVillage(v){PAL=v;buildVillage(v.name);const S=VS();
  B.forEach((b,k)=>{b.roof=k===0?v.hall:v.roofs[(k-1)%v.roofs.length];b.wall=S.walls[k%S.walls.length]});
  let i=0;for(const c of chars)if(!c.isP&&!c.remote&&!c.knight){c.col=S.uniform||S.outfits[i%S.outfits.length];i++}
  for(const k in scenes)if(scenes[k].kind==='house'){scenes[k].wallC=S.inWall;scenes[k].floorC=S.floor}}
@@ -927,6 +964,14 @@ function paintVillage(v){PAL=v;const S=VS();
 $('vlist').addEventListener('mouseleave',()=>previewHold=false);
 paintVillage(VILLAGES[0]);
 setInterval(()=>{if(!st.joined&&!previewHold){previewI=(previewI+1)%VILLAGES.length;paintVillage(VILLAGES[previewI])}},5000);
+function renderPost(){$('pBody').innerHTML=visiting()?`<p>Only people who live in ${esc(VN(PAL.name))} can hire a guard here. Hire one at the knight post back home.</p>`:
+ `<div class="item"><div><b>Guard your field</b><p class="small">${st.guard?`A knight is guarding your field. You pay ${PRICE.guard} coins a day at midnight, to Sempaladom.`:`Hire a knight to stand guard over your field for ${PRICE.guard} coins a day (paid to Sempaladom). Thieves who try your crops are nearly always caught, and night raids can't touch them.`}</p></div><button class="${st.guard?'':'primary'}" data-guard="${st.guard?'off':'on'}" ${!st.guard&&st.coins<PRICE.guard?'disabled':''}>${st.guard?'Send him home':`Hire for ${PRICE.guard} a day`}</button></div><p class="small">You have ${st.coins} coins.</p>`}
+function openPost(){for(const k in K)K[k]=0;renderPost();$('postM').hidden=false;$('px').focus({preventScroll:true})}
+$('px').addEventListener('click',()=>$('postM').hidden=true);
+$('pBody').addEventListener('click',async e=>{const b=e.target.closest('button[data-guard]');if(!b)return;const on=b.dataset.guard==='on';
+ if(NET.ch){const r=await srv('buy',{p_item:on?'guard':'unguard'});if(!r)return}
+ else{if(on){if(st.coins<PRICE.guard)return;st.coins-=PRICE.guard}st.guard=on}
+ hud();renderPost();toast(on?'A knight now guards your field. Thieves beware.':'The knight heads back to Sempaladom.')});
 function openTravel(flee){
  if(!flee&&st.jail){toast(st.jail.trial?'You are in the cells. Open your trial at the town hall if you want to break out.':'You cannot leave while you are in the cells.');return}
  for(const k in K)K[k]=0;const home=VILLAGES.find(v=>v.name===st.homeV);
@@ -953,21 +998,21 @@ async function goTo(v,mode,fled){const from=PAL,wasVisit=visiting();
  const m=st.mem[v.name];for(const k of Object.keys(ROLES))ROLES[k]=m?m.roles[k]:DEFROLES[k];if(!NET.on)LOY=m?m.loy:{};
  st.trials=[];st.builds=[];st.weights={};for(const g of PUBLIC_GROUPS)chats[g]=[];
  if(mode==='move')st.homeV=v.name;
- setupVillage(v);player.scene='village';player.x=37*T;player.y=13*T+12;player.dir=2;WANTED=NET.on?[]:(st.wantedBy[v.name]||[]);
+ setupVillage(v);player.scene='village';player.x=37*T;player.y=LY.R*T+12;player.dir=2;WANTED=NET.on?[]:(st.wantedBy[v.name]||[]);
  if(NET.on){joining=true;try{await netJoin(v,player.display,mode!=='move')}catch(err){joining=false;toast((err&&err.message)||'Could not travel. Try again.');
    if(mode==='move')st.homeV=from.name;setupVillage(from);try{await netJoin(from,player.display,true)}catch(e2){}setVilLabel();$('travel').hidden=true;return}joining=false}
  setVilLabel();$('travel').hidden=true;hud();
  const w=meWanted()?' A wanted poster of you hangs by the knight post. Keep away from the knights!':'';
  toast(fled?`You broke out and ran to ${VN(v.name)}.${w}`:v.name===st.homeV&&mode!=='move'?`Home sweet home: ${VN(v.name)}.${w}`:mode==='move'?`You moved to ${VN(v.name)}. ${VRULES[v.name].rule}${w}`:`You're visiting ${VN(v.name)}. Chat, fish and look around. Only locals can trade or vote here.${w}`)}
 function setupVillage(v){paintVillage(v);const i=VILLAGES.indexOf(v);RIVAL=VILLAGES[(i+1)%VILLAGES.length].name;
- st.tax=RULE().tax??5;LAB.fixed=26;if(RULE().fixedWage)LAB.wage=LAB.fixed;if(RULE().minWage)LAB.wage=Math.max(LAB.wage,RULE().minWage);st.treasury=v.tre;st.online=v.online+1;village.label=VN(v.name);
+ st.tax=RULE().tax??5;LAB.fixed=26;if(RULE().fixedWage)LAB.wage=LAB.fixed;if(RULE().minWage)LAB.wage=Math.max(LAB.wage,RULE().minWage);st.treasury=v.tre;st.online=Math.min(20,v.online+1);village.label=VN(v.name);
  seedProps()}
-async function joinVillage(v){if(joining)return;st.homeV=v.name;const name=($('jName').value.trim()||'Villager').slice(0,20);player.display=name;setupVillage(v);
+async function joinVillage(v){if(joining)return;st.homeV=v.name;const name=($('jName').value.trim()||'Villager').slice(0,20);player.display=name;setupVillage(v);{const sp=SPAWN();player.x=sp.x;player.y=sp.y;player.scene='village'}
  if(NET.on){joining=true;$('jMsg').textContent=`Joining ${VN(v.name)}…`;$('vlist').querySelectorAll('button').forEach(b=>b.disabled=true);
   try{await netJoin(v,name)}catch(e){joining=false;$('jMsg').textContent=(e&&e.message)||'Could not join. Try again.';if(NET.ch){NET.sb.removeChannel(NET.ch);NET.ch=null}renderJoin();return}
   joining=false;$('jMsg').textContent=''}
  st.joined=true;renderAcct();setVilLabel();$('join').hidden=true;document.body.classList.remove('landing-on');hud();setTimeout(tutStart,4200);
- toast(`Welcome to ${VN(v.name)}, ${name}. Fish at the lake, sell to Marlo, visit Vera the architect, or head north to vote.`)}
+ toast(`Welcome to ${VN(v.name)}, ${name}. Fish at the lake, sell to Marlo, visit Vera the architect, or visit the town hall to vote.`)}
 async function loadNames(){if(!NET.sb)return;const {data}=await NET.sb.from('villages').select('name,display');for(const r of data||[]){if(r.display)DISP[r.name]=r.display;else delete DISP[r.name]}if(!st.joined)renderJoin()}
 async function netJoin(v,name,visit){const sb=NET.sb;await loadNames().catch(()=>{});
  let {data:{session}}=await sb.auth.getSession();
@@ -1038,7 +1083,7 @@ function applyServer(row,e){
   if(row.roles)for(const k of Object.keys(ROLES))if(row.roles[k])ROLES[k]={name:String(row.roles[k].name),uid:row.roles[k].uid||null};
   st.ledger=(row.ledger||[]).map(l=>({d:+l.d,t:String(l.t),amt:+l.amt}));st.log=(row.log||[]).map(l=>({r:l.r,m:(l.m||[]).map(String)}));
   st.roundEnds=Date.parse(row.round_started)+(row.round_minutes||5)*60000;
-  if(row.round!==st.round){st.round=row.round;queueHall()}
+  if(row.round!==st.round){const fresh=st.round&&row.round>st.round;st.round=row.round;queueHall();if(fresh&&st.log[0])meetingResults(st.log[0].m)}
   for(const b of row.builds||[])if(!st.builds.some(x=>x.plot===b.plot)&&typeof b.img==='string'&&b.img.startsWith('data:image/png')&&DPLOTS[b.plot]){const img=new Image();img.src=b.img;st.builds.push({plot:b.plot,name:String(b.name),img,by:String(b.by)});const pl=DPLOTS[b.plot];for(let y=pl.y;y<pl.y+pl.h;y++)for(let x=pl.x;x<pl.x+pl.w;x++)village.solid[y][x]=true}
   if(!$('bank').hidden)renderBank();if(!$('vote').hidden)renderVote()}
  hud()}
@@ -1058,7 +1103,7 @@ async function loadHall(){if(!NET.ch)return;const sb=NET.sb;
   st.trials.push(o)}
  if(!$('vote').hidden)renderVote()}
 async function srv(fn,args){const {data,error}=await NET.sb.rpc(fn,args||{});if(error){toast(error.message);return null}if(data&&data.me)applyMe(data.me);return data??{}}
-function applyMe(m){if(!m)return;if(m.loyalty)LOY=Object.fromEntries(Object.entries(m.loyalty).map(([k,v])=>[k,+v]));st.savings=+m.savings||0;st.loan=+m.loan||0;st.repaid=+m.repaid||0;st.defaults=+m.defaults||0;st.insured=!!m.insured;st.score=m.score!=null?+m.score:null;if(!$('bank').hidden)renderBank();st.coins=+m.coins;st.bag=m.bag||{};st.bait=+m.bait||0;FARM.workers=+m.workers||0;FARM.grown=+m.grown||0;st.horse=!!m.horse;st.pet=m.pet||null;
+function applyMe(m){if(!m)return;st.guard=!!m.guard;if(!$('postM').hidden)renderPost();if(m.loyalty)LOY=Object.fromEntries(Object.entries(m.loyalty).map(([k,v])=>[k,+v]));st.savings=+m.savings||0;st.loan=+m.loan||0;st.repaid=+m.repaid||0;st.defaults=+m.defaults||0;st.insured=!!m.insured;st.score=m.score!=null?+m.score:null;if(!$('bank').hidden)renderBank();st.coins=+m.coins;st.bag=m.bag||{};st.bait=+m.bait||0;FARM.workers=+m.workers||0;FARM.grown=+m.grown||0;st.horse=!!m.horse;st.pet=m.pet||null;
  if(m.jail==null){if(st.jail&&!st.jail.arresting){st.jail=null;release()}}else if(m.jail<0){if(!st.jail)st.jail={trial:true}}else st.jail={until:m.jail*60+480};
  hud();if(!$('shop').hidden)renderShopBody();if(!$('mkt').hidden)renderMarket()}
 async function refreshMe(){if(!NET.ch)return;const {data}=await NET.sb.rpc('my_state');if(data)applyMe(data)}
@@ -1199,11 +1244,11 @@ $('rpsBtn').addEventListener('click',openRps);
 $('rx').addEventListener('click',closeRps);
 
 /* ---------- Mayor Odo's tour ---------- */
-const TUT_STEPS=[['fish','Catch a fish: stand by the lake, press E to cast, then E again when you see "!".'],['sell','Sell your fish to Marlo at the fish stall by the lake.'],['market',"Check today's prices on the market board in the square."],['vote','Go to the town hall in the north and agree or disagree with a proposal.'],['chat','Sit at the campfire and say hello.'],
- ['ok','Shady business: walk up to any villager and press Q. You can pickpocket them for a few coins, or pick a fight, knock them out and take what they carry.'],
+const TUT_STEPS=[['fish','Catch a fish: stand by the lake, press E to cast, then E again when you see "!".'],['sell','Sell your fish to Marlo at the fish stall by the lake.'],['market',"Check today's prices on the market board in the square."],['vote','Go to the town hall and agree or disagree with a proposal. Votes are counted at the town meeting every other day at 18:00, when the whole village turns up.'],['chat','Sit at the campfire and say hello.'],
+ ['ok','Shady business: walk up to any villager and press Q. You can pickpocket them for a few coins, or pick a fight, knock them out and take what they carry. Press Q by the fields to steal some crops.'],
  ['ok','Think twice. The knights of Sempaladom patrol every village, and they catch you far more often when one is close by. If you are caught you go to the cells, and the village votes on your punishment: a warning, a fine, jail, or even execution, which takes everything you own.'],
  ['ok','Villagers remember. The one you hurt turns against you and the rest grow wary. They vote against your proposals, can ask the village to lower your vote, and push for harsher punishments at your trial.'],
- ['ok','Kindness pays too. Trade with villagers, buy rounds at the pub and donate to the treasury, and they will back your proposals, vote you into office and go easy on you if you ever slip up. You can see who is on your side at the town hall.']];
+ ['ok','Kindness pays too. Trade with villagers, buy rounds at the pub and donate to the treasury (and hire a knight at the knight post to guard your own field), and they will back your proposals, vote you into office and go easy on you if you ever slip up. You can see who is on your side at the town hall.']];
 let TUT={i:0,on:false};
 function tutStart(){try{if(localStorage.getItem('ideally-tour')==='done')return}catch(e){}TUT={i:0,on:true};renderTut()}
 function renderTut(){$('tut').hidden=!TUT.on;if(!TUT.on)return;$('tutT').textContent=`Mayor Odo's tour · ${TUT.i+1} of ${TUT_STEPS.length}`;$('tutS').textContent=TUT_STEPS[TUT.i][1];$('tutOk').hidden=TUT_STEPS[TUT.i][0]!=='ok'}
@@ -1214,7 +1259,7 @@ $('tutSkip').addEventListener('click',tutDone);$('tutOk').addEventListener('clic
 /* ---------- ui helpers ---------- */
 function hud(){$('hCoin').textContent=st.coins;$('hFish').textContent=bagCount();$('hClock').textContent=clock();$('hOn').textContent=st.joined?st.online+'/20':'-'}
 let tt;function toast(s){const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3800)}
-const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden||!$('mkt').hidden||!$('rps').hidden||!$('bank').hidden||!$('crime').hidden||!$('acctM').hidden||!$('travel').hidden;
+const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden||!$('mkt').hidden||!$('rps').hidden||!$('bank').hidden||!$('crime').hidden||!$('acctM').hidden||!$('travel').hidden||!$('postM').hidden;
 
 /* ---------- fishing ---------- */
 let fish=null;
@@ -1235,7 +1280,7 @@ function nearWater(){let best=null,bd=26;for(let y=16;y<25;y++)for(let x=29;x<VW
 function blocked(sc,x,y){for(const [ox,oy] of [[-5,-4],[5,-4],[-5,1],[5,1]]){const tx=Math.floor((x+ox)/T),ty=Math.floor((y+oy)/T);if(tx<0||ty<0||tx>=sc.w||ty>=sc.h||sc.solid[ty][tx])return true}return false}
 function sitPlayer(s){sitAt(player,s);openChat(groupOf(player))}
 function stand(){if(player.sit){player.sit.who=null;player.sit=null}closeChat()}
-function enter(b){if(b.shop){openShop(b.shop);return}if(b.bank){openBank();return}if(b.post){toast(`The knights' post. Sempaladom's knights keep the peace here, and the cells are just south.`);return}const sc=scenes[b.scene];netEnter(b);player.scene=b.scene;player.from=b;player.x=sc.exitX*T+8;player.y=(sc.h-2)*T+10;player.dir=1;
+function enter(b){if(b===HOME&&visiting()){toast('That house belongs to a local. Your own house is back home.');return}if(b.shop){openShop(b.shop);return}if(b.bank){openBank();return}if(b.post){openPost();return}const sc=scenes[b.scene];netEnter(b);player.scene=b.scene;player.from=b;player.x=sc.exitX*T+8;player.y=(sc.h-2)*T+10;player.dir=1;
  toast(b.scene==='home'?'Your house. Later you could invite friends here for a private chat.':sc.kind==='house'?`You are inside ${b.name}. Sit at the table to join their private chat.`:sc.kind==='hall'?'The voting board is on the back wall.':'Welcome to the pub. Order at the bar, or grab a seat.')}
 function leave(){netLeave();const b=player.from;player.scene='village';player.x=b.door*T+8;player.y=(b.y+b.h)*T+12;player.dir=0}
 function findTarget(){const sc=scenes[player.scene],px=player.x,py=player.y;
@@ -1243,24 +1288,55 @@ function findTarget(){const sc=scenes[player.scene],px=player.x,py=player.y;
  if(player.sit)return {label:'Press Enter to type, Esc to stand up',fn:()=>$('cIn').focus()};
  if(fish)return fish.phase==='bite'?{label:'A bite! Press now!',hot:true,fn:reel}:{label:'Waiting for a bite… press when you see !',fn:reel};
  if(sc===village){
-  for(const c of [marlo,vera,pip])if(Math.hypot(px-c.x,py-c.y)<28||c===marlo&&Math.hypot(px-33.5*T,py-16*T)<36)return {label:`Talk to ${c.name}, the ${SHOP[c.shop].role.toLowerCase()}`,fn:()=>openShop(c.shop)};
-  if(Math.hypot(px-(7.5*T),py-(24.5*T))<26)return {label:'Farm office: hire farmhands',fn:()=>openMarket('farm')};
-  if(Math.hypot(px-(15.5*T),py-(15.5*T))<26)return {label:'Check market prices',fn:()=>openMarket('market')};
-  if(px>8*T&&px<12*T&&py>24*T&&py<27*T+4)return FARM.grown>=1?{label:`Harvest ${Math.floor(FARM.grown)} wheat`,fn:harvest}:{label:FARM.workers?'Your crop is growing':'Your farm: hire farmhands at the farm office',fn:()=>openMarket('farm')};
+  for(const c of [marlo,vera,pip])if(Math.hypot(px-c.x,py-c.y)<28||c===marlo&&Math.hypot(px-(LY.stall[0]+1.5)*T,py-(LY.stall[1]+1)*T)<36)return {label:`Talk to ${c.name}, the ${SHOP[c.shop].role.toLowerCase()}`,fn:()=>openShop(c.shop)};
+  if(Math.hypot(px-(LY.farm[0]-.5)*T,py-(LY.farm[1]+.5)*T)<26)return {label:'Farm office: hire farmhands',fn:()=>openMarket('farm')};
+  if(Math.hypot(px-(LY.mkt[0]+.5)*T,py-(LY.mkt[1]+.5)*T)<26)return {label:'Check market prices',fn:()=>openMarket('market')};
+  if(!visiting()&&px>LY.farm[0]*T&&px<(LY.farm[0]+4)*T&&py>LY.farm[1]*T&&py<(LY.farm[1]+3)*T+4)return FARM.grown>=1?{label:`Harvest ${Math.floor(FARM.grown)} wheat`,fn:harvest}:{label:FARM.workers?'Your crop is growing':'Your farm: hire farmhands at the farm office',fn:()=>openMarket('farm')};
   for(const b of doorsOf()){if(Math.hypot(px-(b.door*T+8),py-((b.y+b.h)*T+6))<14)return {label:b.shop?"Visit Vera's architect studio":b.bank?'Visit the bank':b.post?'Knight post':'Enter '+b.name,fn:()=>enter(b)}}
   for(const [i,p] of DPLOTS.entries())if(!st.builds.some(b=>b.plot===i)&&px>p.x*T-6&&px<(p.x+p.w)*T+6&&py>p.y*T-4&&py<(p.y+p.h)*T+10)return {label:'Empty plot: design a building at Vera\'s studio',fn:()=>toast('Design a building at Vera\'s studio, then win the vote at the town hall to build it here.')};
-  if(Math.hypot(px-(38.5*T),py-(13.5*T))<30||px>38.4*T)return {label:visiting()?'Take the road (home or elsewhere)':'Take the road to another village',fn:()=>openTravel(false)};
-  if(Math.hypot(px-(6.5*T),py-(16*T))<22)return {label:WANTED.length?'Read the wanted posters':'The wanted board is empty',fn:()=>toast(WANTED.length?WANTED.map(w=>`WANTED: ${w.name}, for ${w.crime}${w.from?`, who ran from ${w.from}`:''}.`).join(' '):'No outlaws here. Good.')};
+  if(Math.hypot(px-38.5*T,py-(LY.R-.5)*T)<30||px>38.4*T)return {label:visiting()?'Take the road (home or elsewhere)':'Take the road to another village',fn:()=>openTravel(false)};
+  if(Math.hypot(px-(WB.x+.5)*T,py-(WB.y+1)*T)<22)return {label:WANTED.length?'Read the wanted posters':'The wanted board is empty',fn:()=>toast(WANTED.length?WANTED.map(w=>`WANTED: ${w.name}, for ${w.crime}${w.from?`, who ran from ${w.from}`:''}.`).join(' '):'No outlaws here. Good.')};
   const w=nearWater();if(w)return {label:st.bait?`Cast your line (golden bait: ${st.bait} left)`:'Cast your line',fn:()=>cast(w)}}
  if(sc.key==='hall'&&Math.hypot(px-(8*T+8),py-(2*T+12))<22)return {label:'Read the voting board',fn:openVote};
  if(sc.key==='tavern'&&Math.hypot(px-(10.5*T),py-(3.4*T))<26)return {label:'Order at the bar',fn:()=>openShop('hilda')};
  let best=null,bd=20;for(const s of sc.seats){if(s.who)continue;const d=Math.hypot(px-(s.x*T+8),py-(s.y*T+12));if(d<bd){bd=d;best=s}}
  if(best)return {label:'Sit down and chat',fn:()=>sitPlayer(best)};return null}
+/* ---------- the town meeting: every other day at 18:00, every villager gathers at the town hall ---------- */
+const CYCLE=2880,MEET_T=2520; // ECO.time is minutes since day 1 00:00; day 2, 4, 6... at 18:00
+const meetPhase=()=>{if(!st.joined)return null;const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;return t>=MEET_T-180&&t<MEET_T?'gather':t>=MEET_T&&t<MEET_T+60?'meet':null};
+const nextMeetT=()=>{const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;let m=ECO.time-t+MEET_T;if(m+60<=ECO.time)m+=CYCLE;return m};
+function leaderNpc(){const h=ROLES.leader;return chars.find(c=>!c.isP&&!c.remote&&c.name===(h&&!h.uid&&!h.you?h.name:'Mayor Odo'))}
+function meetingResults(m){MEETRES=m.slice(0,5);MEETLINE=0;toast('Town meeting: '+m.slice(0,2).join(' '))}
+function startMeet(c,spot,speaker){c.meeting={prev:{scene:c.scene,x:c.x,y:c.y,dir:c.dir,seat:c.sit},spot,speaker};if(c.sit){c.sit.who=null;c.sit=null}
+ if(c.scene!=='village'){const b=B.find(b=>b.scene===c.scene);const p=b?{x:b.door*T+8,y:(b.y+b.h)*T+12}:SPAWN();c.x=p.x;c.y=p.y;c.scene='village'}c.tx=null}
+function endMeet(c){const p=c.meeting.prev;c.meeting=null;c.scene=p.scene;c.x=p.x;c.y=p.y;c.dir=p.dir;c.moving=false;if(p.seat&&!p.seat.who)sitAt(c,p.seat)}
+function endAllMeet(){for(const c of chars)if(c.meeting)endMeet(c);MEETF=null}
+function meetTick(dt,now){const ph=meetPhase();
+ if(!ph){if(MEETF){endAllMeet();MEETRES=null}return}
+ if(!MEETF){const h=B[0],dx=h.door,dy=h.y+h.h,sp=[];
+  for(let y=dy+1;y<Math.min(VH-1,dy+8);y++)for(let x=Math.max(1,dx-6);x<=Math.min(VW-2,dx+6);x++)if(!village.solid[y][x])sp.push([x,y]);
+  sp.sort((a,b)=>Math.hypot(a[0]-dx,(a[1]-dy)*1.4)-Math.hypot(b[0]-dx,(b[1]-dy)*1.4));
+  MEETF=grid(VW,VH,1e9);MEETF[dy][dx]=0;const q=[[dx,dy]];
+  for(let i=0;i<q.length;i++){const [x,y]=q[i];for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+ax,ny=y+ay;if(nx<0||ny<0||nx>=VW||ny>=VH||village.solid[ny][nx]||MEETF[ny][nx]<=MEETF[y][x]+1)continue;MEETF[ny][nx]=MEETF[y][x]+1;q.push([nx,ny])}}
+  const nm=nextMeetT();if(MEETNOTE!==nm){MEETNOTE=nm;toast(ph==='gather'?`Town meeting at 18:00! Everyone in ${VN(PAL.name)} is heading to the town hall.`:'The town meeting is on at the town hall!')}
+  const sk=leaderNpc();let i=0;
+  for(const c of chars){if(c.isP||c.remote||c.knight||c.jailed||c.gone||c.scene==='gone')continue;startMeet(c,c===sk?[dx,dy]:sp[i++%Math.max(1,sp.length)],c===sk);
+   if(ph==='meet'){c.x=c.meeting.spot[0]*T+8;c.y=c.meeting.spot[1]*T+12}}}
+ for(const c of chars){if(!c.meeting)continue;if(c.jailed||c.gone){c.meeting=null;continue}
+  const [sx,sy]=c.meeting.spot,gx=sx*T+8,gy=sy*T+12;let tx=gx,ty=gy;const cx=Math.floor(c.x/T),cy=Math.floor((c.y-4)/T);
+  if(Math.hypot(gx-c.x,gy-c.y)>2.5*T&&MEETF[cy]&&MEETF[cy][cx]<1e9){let bd=MEETF[cy][cx],best=null;
+   for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+ax,ny=cy+ay;if(MEETF[ny]&&MEETF[ny][nx]<bd){bd=MEETF[ny][nx];best=[nx,ny]}}if(best){tx=best[0]*T+8;ty=best[1]*T+12}}
+  const ex=tx-c.x,ey=ty-c.y,d=Math.hypot(ex,ey);
+  if(d>1.5){const m=Math.min(d,56*dt);c.x+=ex/d*m;c.y+=ey/d*m;c.moving=true;c.dir=Math.abs(ex)>Math.abs(ey)?(ex>0?3:2):(ey>0?0:1)}
+  else{c.moving=false;c.dir=c.meeting.speaker?0:1}
+  if(now>c.bt+600&&Math.random()<dt*(c.meeting.speaker?.6:.05)){
+   if(c.meeting.speaker){c.bubble=ph==='gather'?pick(['Gather round, everyone!','The meeting starts at six.','Come on, find a spot!']):MEETRES?MEETRES[MEETLINE++%MEETRES.length]:pick(['Order! Order!','Welcome, everyone.','Let us count the votes!']);c.bt=now+3400}
+   else if(ph==='meet'||d<=1.5){c.bubble=pick(ph==='meet'?['Hear, hear!','Aye!','Nay!','About time.','What about the roads?','Shh!']:['Coming!','Is it six already?','Wait for me!']);c.bt=now+2200}}}}
 let target=null,lastLabel='';
 function act(){if(modalOpen())return;if(target)target.fn()}
 const K={up:0,down:0,left:0,right:0},KM={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'){if(e.key==='Escape')e.target.blur();return}
- if(e.key==='Escape'){if(!$('ed').hidden)closeEd();else if(!$('acctM').hidden)$('acctM').hidden=true;else if(!$('crime').hidden)$('crime').hidden=true;else if(!$('travel').hidden)$('travel').hidden=true;else if(!$('bank').hidden)$('bank').hidden=true;else if(!$('rps').hidden)closeRps();else if(!$('mkt').hidden)$('mkt').hidden=true;else if(!$('shop').hidden)closeShop();else if(!$('vote').hidden)closeVote();else if(fish){fish=null}else stand();return}
+ if(e.key==='Escape'){if(!$('ed').hidden)closeEd();else if(!$('acctM').hidden)$('acctM').hidden=true;else if(!$('crime').hidden)$('crime').hidden=true;else if(!$('travel').hidden)$('travel').hidden=true;else if(!$('postM').hidden)$('postM').hidden=true;else if(!$('bank').hidden)$('bank').hidden=true;else if(!$('rps').hidden)closeRps();else if(!$('mkt').hidden)$('mkt').hidden=true;else if(!$('shop').hidden)closeShop();else if(!$('vote').hidden)closeVote();else if(fish){fish=null}else stand();return}
  if(modalOpen()||e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;
  if(KM[e.code]){K[KM[e.code]]=1;e.preventDefault()}else if(e.code==='KeyE'||e.code==='Space'||e.code==='Enter'){e.preventDefault();act()}else if(e.code==='KeyQ'){e.preventDefault();openCrime()}});
 addEventListener('keyup',e=>{if(KM[e.code])K[KM[e.code]]=0});
@@ -1279,9 +1355,9 @@ function update(dt,now){const sc=scenes[player.scene]||village,locked=modalOpen(
   if(!blocked(sc,nx,player.y)){player.x=nx;player.moving=true}if(!blocked(sc,player.x,ny)){player.y=ny;player.moving=true}
   player.dir=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:2):(dy>0?0:1);
   if(sc!==village&&player.y>(sc.h-1)*T+4)leave()}
- if(st.joined&&!NET.ch){ECO.acc+=dt*1000;while(ECO.acc>=HOUR_MS){ECO.acc-=HOUR_MS;ECO.time+=60;hourTick();personalHour();if(ECO.time%1440===0){newDay();personalDay()}hud()}}
+ if(st.joined&&!NET.ch){ECO.acc+=dt*1000;while(ECO.acc>=HOUR_MS){ECO.acc-=HOUR_MS;const t0=ECO.time;ECO.time+=60;hourTick();personalHour();if(Math.floor((t0-MEET_T)/CYCLE)!==Math.floor((ECO.time-MEET_T)/CYCLE))countVotes();if(ECO.time%1440===0){newDay();personalDay()}hud()}}
  if(fish){if(fish.phase==='wait'&&now>fish.until){fish.phase='bite';fish.until=now+(st.bait?1300:900)}else if(fish.phase==='bite'&&now>fish.until){fish=null;toast('It got away. Try again.')}}
- for(const c of chars){if(c.scene!=='village'||c.isP)continue;
+ for(const c of chars){if(c.scene!=='village'||c.isP||c.meeting)continue;
   if(c.wander){if(c.wait>0){c.wait-=dt;c.moving=false}
    else{if(c.tx==null){const tx=Math.floor(rnd(3,37)),ty=Math.floor(rnd(12,24));if(!village.solid[ty][tx]){c.tx=tx*T+8;c.ty=ty*T+12}}
     if(c.tx!=null){const ex=c.tx-c.x,ey=c.ty-c.y,d=Math.hypot(ex,ey);
@@ -1291,16 +1367,16 @@ function update(dt,now){const sc=scenes[player.scene]||village,locked=modalOpen(
  if(now>nextTalk){const cand=chars.filter(c=>c!==player&&!c.remote&&c.scene===player.scene&&c.sit);
   if(cand.length){const c=pick(cand),g=groupOf(c);let line;do line=pick(LINES[kindOf(g)]);while(line===lastLine);lastLine=line;post(g,c,fill(line))}
   nextTalk=now+(curGroup?rnd(4000,7500):rnd(5500,9500))}
- netTick(dt,now);
+ netTick(dt,now);meetTick(dt,now);
  // knights: one patrols the main road, one guards the post; either will chase a wanted player
  for(const k of [knightA,knightB]){if(k.scene!=='village')continue;let tx,ty,sp=30;
   if(!k.chase&&!st.jail&&player.scene==='village'&&!modalOpen()&&meWanted()&&Math.hypot(player.x-k.x,player.y-k.y)<7*T){k.chase='wanted';k.bubble='Outlaw! Stop right there!';k.bt=now+3000;toast('A knight recognised you from the wanted poster. Run!')}
   if(k.chase==='wanted'&&(player.scene!=='village'||!meWanted()||st.jail))k.chase=false;
   if(k.chase){tx=player.x;ty=player.y;sp=95;if(Math.hypot(tx-k.x,ty-k.y)<10){const w=k.chase==='wanted';k.chase=false;if(w)caughtWanted();else lockUp()}}
-  else if(k.patrol){tx=k.patrol>0?37*T:4*T;ty=14*T+12;if(Math.abs(tx-k.x)<4)k.patrol*=-1}else{tx=k.home.x;ty=k.home.y}
+  else if(k.patrol){tx=k.patrol>0?37*T:4*T;ty=LY.R*T+12;if(Math.abs(tx-k.x)<4)k.patrol*=-1}else{tx=k.home.x;ty=k.home.y}
   const ex=tx-k.x,ey=ty-k.y,d=Math.hypot(ex,ey);if(d>1){const m=Math.min(d,sp*dt);k.x+=ex/d*m;k.y+=ey/d*m;k.moving=true;k.dir=Math.abs(ex)>Math.abs(ey)?(ex>0?3:2):(ey>0?0:1)}else k.moving=false}
  if(st.pet){const tx=player.x+(player.dir===3?-14:14),ty=player.y+2,ex=tx-petPos.x,ey=ty-petPos.y,d=Math.hypot(ex,ey);if(petPos.scene!==player.scene||d>120){petPos.x=tx;petPos.y=ty;petPos.scene=player.scene}else if(d>3){const m=Math.min(d,Math.max(60,d*3)*dt);petPos.x+=ex/d*m;petPos.y+=ey/d*m;petPos.moving=true}else petPos.moving=false}
- const ct=!locked&&crimeTarget();$('qBtn').hidden=!ct;
+ const ct=!locked&&(crimeTarget()||nearFields());$('qBtn').hidden=!ct;
  if(st.joined&&!NET.ch&&now>st.drift){st.drift=now+rnd(15000,30000);st.online=Math.max(2,Math.min(20,st.online+pick([-1,0,1])));hud()}
  target=modalOpen()?null:findTarget();const coarse=matchMedia('(pointer:coarse)').matches;
  let lab=target?target.label:'';const qOnly=false;
@@ -1356,7 +1432,7 @@ function bldBase(b){const S=VS(),X=b.x*T,Y=b.y*T,W=b.w*T,H=b.h*T,flat=S.roof==='
   if(S.roof==='flat'){R('#c8302a',X+W/2-4,Y+rh+1,8,1)}}
  if(b.shop==='vera'){R('#4a3a2a',X+W-3,Y+rh+4,2,14);R('#fff',X+W-14,Y+rh+6,10,8);R('#3c5a99',X+W-12,Y+rh+8,6,1);R('#c8434b',X+W-12,Y+rh+10,4,2)}
  if(b.scene==='tavern'){R('#4a3a2a',dx+13,Y+H-20,6,1);R('#ffcf4d',dx+14,Y+H-19,4,5)}}
-function bld(b){if(b.custom){R('rgba(0,0,0,.22)',b.x*T+3,(b.y+b.h)*T-2,b.w*T,4);ctx.drawImage(b.custom,b.x*T,b.y*T);return}bldBase(b)}
+function bld(b){if(b.custom&&!(b===HOME&&visiting())){R('rgba(0,0,0,.22)',b.x*T+3,(b.y+b.h)*T-2,b.w*T,4);ctx.drawImage(b.custom,b.x*T,b.y*T);return}bldBase(b)}
 function market(p){const X=p.x*T,Y=p.y*T,W=p.w*T;R('rgba(0,0,0,.2)',X+2,Y+44,W,4);R('#6b4226',X+2,Y+8,2,38);R('#6b4226',X+W-4,Y+8,2,38);
  for(let i=0;i<W;i+=8)R((i/8)%2?'#fff4e0':'#d9463b',X+i,Y+4,8,12);R('#a8323a',X,Y+16,W,2);R('#8b5a33',X+2,Y+30,W-4,14);R('#a8734a',X+2,Y+30,W-4,3);
  [['#e84a3a',8],['#f2c23a',20],['#5cbf4a',34],['#e8823a',46]].forEach(([c,o])=>{R(c,X+o,Y+26,5,4);R(c,X+o+3,Y+24,4,3)})}
@@ -1419,7 +1495,7 @@ function charD(c,now,noShadow){if(c.ko>now){ctx.save();ctx.translate(c.x,c.y-5);
  if(c.knight){R('#c8434b',x-2,by-8,4,8);R('#b8c0c8',x-5,hy-2,10,5);R('#7d858c',x-5,hy+2,10,1);R('#d0d6dc',x-1,hy-4,2,2)}
  if(c.isP||c.isPm){const b=(now/300|0)%2;R('#ffe14d',x-2,hy-7-b,5,2);R('#ffe14d',x-1,hy-5-b,3,1);if(player.merry>ECO.time){R('#f2c23a',x+6,hy-1,4,5);R('#ffffff',x+6,hy-2,4,2);R('#c9a227',x+10,hy,1,3)}}}
 function crops(now){const g=FARM.grown/FARM.cap;
- for(let y=24;y<27;y++)for(let x=8;x<20;x++){const X=x*T,Y=y*T,mine=x<12,st2=mine?(g<.03?0:g<.3?1:g<.65?2:3):(2+((x+y+Math.floor(ECO.time/240))%2));
+ const [Fx,Fy]=LY.farm,vis=visiting();for(let y=Fy;y<Fy+3;y++)for(let x=Fx;x<Fx+12;x++){const X=x*T,Y=y*T,mine=x<Fx+4&&!vis,st2=mine?(g<.03?0:g<.3?1:g<.65?2:3):(2+((x+y+Math.floor(ECO.time/240))%2));
   if(!st2)continue;for(let k=0;k<4;k++){const cx=X+2+k*4,sway=((now/600+x+k)|0)%2;
    if(st2===1){R('#5cbf4a',cx,Y+10,1,3);R('#5cbf4a',cx+1,Y+9,1,2)}
    else if(st2===2){R('#3f9a3a',cx,Y+5,1,9);R('#5cbf4a',cx+1,Y+6+sway,1,3)}
@@ -1427,9 +1503,9 @@ function crops(now){const g=FARM.grown/FARM.cap;
 const HANDS=[[8.6,24.7],[10.6,24.7],[9.4,26],[11.4,26],[12.8,24.8],[15.2,25.9],[17.6,24.8],[13.9,26.1],[16.4,24.6],[18.9,26],[14.6,24.9],[19.4,25]];
 const HAIRS=['#3a2618','#7a3b12','#1a1a1a','#d9b45a','#5a2a1a'];
 function farmhands(now){const L=[],npcShown=Math.min(8,Math.round(LAB.npc/4));
- const mk=(i,mine)=>{const [hx,hy]=HANDS[i],bob=((now/(300+i*37))|0)%2;return {name:'',col:mine?'#c9a227':'#a8893a',hair:HAIRS[i%5],skin:skins[i%5],x:hx*T,y:hy*T+bob,dir:i%2?2:3,moving:!!bob,sit:null}};
- for(let i=0;i<FARM.workers;i++)L.push(mk(i,true));for(let i=0;i<npcShown;i++)L.push(mk(4+i,false));return L}
-function lanterns(now){const cols=['#ff6b6b','#ffd93d','#6bcbff','#b28dff'];for(const yy of [12*T-2,18*T+2]){R('#3a2a20',16*T,yy,9*T,1);for(let i=0;i<12;i++){const lx=16*T+6+i*12,c=cols[i%4];R(c,lx,yy+2,4,5);if(((now/500|0)+i)%3===0)R('rgba(255,230,120,.25)',lx-3,yy-1,10,11)}}}
+ const mk=(i,mine)=>{const hx=HANDS[i][0]+LY.farm[0]-8,hy=HANDS[i][1]+LY.farm[1]-24,bob=((now/(300+i*37))|0)%2;return {name:'',col:mine?'#c9a227':'#a8893a',hair:HAIRS[i%5],skin:skins[i%5],x:hx*T,y:hy*T+bob,dir:i%2?2:3,moving:!!bob,sit:null}};
+ if(!visiting()){for(let i=0;i<FARM.workers;i++)L.push(mk(i,true));if(st.guard)L.push({name:'',knight:true,col:'#9aa4ad',hair:'#7d858c',skin:skins[0],x:(LY.farm[0]+4)*T,y:(LY.farm[1]+1.6)*T,dir:0,moving:false,sit:null})}for(let i=0;i<npcShown;i++)L.push(mk(4+i,false));return L}
+function lanterns(now){const cols=['#ff6b6b','#ffd93d','#6bcbff','#b28dff'];const [fx,fy]=LY.fire;for(const yy of [(fy-3)*T-2,(fy+3)*T+2]){R('#3a2a20',(fx-4)*T,yy,9*T,1);for(let i=0;i<12;i++){const lx=(fx-4)*T+6+i*12,c=cols[i%4];R(c,lx,yy+2,4,5);if(((now/500|0)+i)%3===0)R('rgba(255,230,120,.25)',lx-3,yy-1,10,11)}}}
 function line(now){if(!fish||player.scene!=='village')return;const hx=player.x+(player.dir===2?-6:6),hy=player.y-12,bob=fish.phase==='bite'?2:Math.round(Math.sin(now/300));
  ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(hx,hy);ctx.quadraticCurveTo((hx+fish.bx)/2,Math.min(hy,fish.by)-10,fish.bx,fish.by+bob);ctx.stroke();
  R('#6b4226',player.x+(player.dir===2?-7:5),player.y-14,1,8);R('#fff',fish.bx-2,fish.by-2+bob,4,2);R('#d9463b',fish.bx-2,fish.by+bob,4,2);
@@ -1467,8 +1543,8 @@ function draw(now){const sc=scenes[player.scene],vw=cv.width/S,vh=cv.height/S,mw
  ctx.setTransform(1,0,0,1,0,0);const SX=wx=>(wx-cam.x)*S,SY=wy=>(wy-cam.y)*S;
  if(sc===village){for(const b of doorsOf())txt(b.post&&PAL.name==='Sempaladom'?'Barracks':b===HOME&&visiting()?'Guest house':b.name,SX((b.x+b.w/2)*T),SY(b.y*T-(b.hall?18:3)),13);
   for(const [i,p] of DPLOTS.entries()){const bd=st.builds.find(b=>b.plot===i);txt(bd?bd.name:'Free plot',SX((p.x+p.w/2)*T),SY(bd?p.y*T-2:(p.y+p.h/2)*T-8),12)}
-  txt('Cells',SX(3.5*T),SY(18*T),12);txt('Stable',SX(27*T),SY(15*T-2),12);
-  txt('Fishmonger',SX(33.5*T),SY(15*T-2),12);txt('Your farm',SX(10*T),SY(24*T-1),12);txt('Village farms',SX(16*T),SY(24*T-1),12);txt('Farm office',SX(7.5*T),SY(24*T-5),12);txt('Market prices',SX(15.5*T),SY(15*T-5),12);txt('To other villages',SX(38.5*T),SY(13*T),12);if(WANTED.length)txt('Wanted',SX(6.5*T),SY(14.2*T),12,'#f28a7a')}
+  txt('Cells',SX((CELL.x+1.5)*T),SY(CELL.y*T),12);txt('Stable',SX((LY.stable[0]+1)*T),SY(LY.stable[1]*T-2),12);
+  {const [Fx,Fy]=LY.farm;txt('Fishmonger',SX((LY.stall[0]+1.5)*T),SY(LY.stall[1]*T-2),12);txt(visiting()?'Local farm':'Your farm',SX((Fx+2)*T),SY(Fy*T-1),12);txt('Village farms',SX((Fx+8)*T),SY(Fy*T-1),12);txt('Farm office',SX((Fx-.5)*T),SY(Fy*T-5),12);txt('Market prices',SX((LY.mkt[0]+.5)*T),SY(LY.mkt[1]*T-5),12);txt('To other villages',SX(38.5*T),SY((LY.R-1)*T),12);if(WANTED.length)txt('Wanted',SX((WB.x+.5)*T),SY((WB.y-.8)*T),12,'#f28a7a')}}
  {const mine=myRoles();if(mine.length&&player.scene===sc.key&&!(player.bubble&&now<player.bt))txt(roleTitle(mine[0]),SX(player.x),SY(player.y-(player.sit?24:31)),12,'#f2d27a')}
  for(const c of chars)if(c.scene===sc.key&&!c.isP&&(c.remote||Math.hypot(c.x-player.x,c.y-player.y)<56)&&!(c.bubble&&now<c.bt))txt(c.name,SX(c.x),SY(c.y-(c.sit?22:26)),12);
  if(fish&&fish.phase==='bite')txt('!',SX(player.x),SY(player.y-28),26,'#ffe14d');
