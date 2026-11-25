@@ -87,6 +87,81 @@
         </div>
       </div>
 
+      <div id="libM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="libH">
+        <div class="card wide">
+          <h2 id="libH">The Library</h2>
+          <p class="small">
+            Interesting reads shared by players from every village. Links open other websites, so take care.
+            Recommend the good ones; three reports take an article off the shelves.
+          </p>
+          <div id="libList" class="artlist"></div>
+          <h3>Add an article</h3>
+          <div class="form">
+            <input id="libTitle" maxlength="80" placeholder="Title" aria-label="Title" />
+            <input id="libUrl" maxlength="300" placeholder="https://…" aria-label="Link" />
+            <input
+              id="libNote"
+              maxlength="160"
+              placeholder="Why is it interesting? (optional)"
+              aria-label="Why"
+            />
+            <button class="primary" id="libAdd">Add to the shelves</button>
+          </div>
+          <p class="small">Only share things that are safe and legal. You can add 3 articles a day.</p>
+          <div class="row"><button id="libX">Close</button></div>
+        </div>
+      </div>
+      <div id="awayM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="awH">
+        <div class="card">
+          <h2 id="awH">While you were away</h2>
+          <p class="small" id="awWhen"></p>
+          <ul id="awList" class="awlist"></ul>
+          <div class="row"><button class="primary" id="awX">Back to the village</button></div>
+        </div>
+      </div>
+      <div id="legalM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="lgH">
+        <div class="card">
+          <h2 id="lgH">Terms and privacy</h2>
+          <h3>Terms of play</h3>
+          <ul class="legal">
+            <li>
+              Ideally is a free game made for fun. It comes as it is, with no guarantees, and it can change,
+              reset or close at any time.
+            </li>
+            <li>
+              Coins, houses, items and everything else in the game have no real-world value and can't be
+              exchanged for money.
+            </li>
+            <li>
+              Be kind. No harassment, hate, threats, sexual content, spam, or sharing anyone's personal
+              details.
+            </li>
+            <li>In-game crime, raids and votes are part of the game, not a licence to bully real people.</li>
+            <li>Don't cheat, exploit bugs or attack the game's servers. Report bugs instead.</li>
+            <li>
+              Only add safe, legal links to the library. Links lead to other websites that we don't control.
+            </li>
+            <li>We may remove messages, articles or accounts that break these rules.</li>
+          </ul>
+          <h3>Privacy</h3>
+          <ul class="legal">
+            <li>
+              If you give us your email, its <b>only</b> use is to connect your account across devices: we
+              send you a log-in link so you can play anywhere. No newsletters, no marketing, and it is never
+              shared or sold.
+            </li>
+            <li>
+              To run the game we also keep your player name, your progress, and the chat messages and articles
+              you post. Other players can see your name, chats and articles.
+            </li>
+            <li>Everything is stored with Supabase, the database the game runs on.</li>
+            <li>
+              Want your account deleted? <span id="lgContact">Ask the game's owner</span> and we'll remove it.
+            </li>
+          </ul>
+          <div class="row"><button class="primary" id="lgX">Close</button></div>
+        </div>
+      </div>
       <div id="postM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="pH">
         <div class="card">
           <h2 id="pH">Knight post</h2>
