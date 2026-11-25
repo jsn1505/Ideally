@@ -180,6 +180,16 @@ body.seated #prompt{left:12px;transform:none;max-width:calc(100% - 380px)}
 body.landing-on .bar{display:none}
 @media(prefers-reduced-motion:reduce){.landing .vcard{transition:none}}
 /* tutorial */
+#scroll{position:absolute;left:50%;top:6%;transform:translateX(-50%);width:min(560px,92%);z-index:6;filter:drop-shadow(0 10px 24px rgba(0,0,0,.45))}
+#scroll .rod{height:20px;margin:0 -16px;border-radius:10px;background:linear-gradient(#a8734a,#5a3620 55%,#8b5a33);position:relative;z-index:1}
+#scroll .paper{background:linear-gradient(90deg,#e8d3a4,#f6e8c6 12%,#f6e8c6 88%,#e8d3a4);color:#3a2618;max-height:0;overflow:hidden;padding:0 26px;margin:-6px 0;transition:max-height 1.8s ease-out,padding 1.8s ease-out}
+#scroll.open .paper{max-height:72vh;overflow:auto;padding:18px 26px 14px}
+#scroll h2{font:700 24px/1.2 'Cinzel Decorative',serif;text-align:center;margin:0 0 10px}#scroll .scD{text-align:center;font:600 13px 'Cinzel',serif;margin:0;opacity:.7}
+#scroll h3{font:700 15px 'Cinzel',serif;margin:14px 0 4px;border-top:1px solid #c9ab76;padding-top:10px}#scroll p{margin:4px 0;font-size:14px}
+.motion{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px dashed #c9ab76}.motion .mt{font-weight:700}
+.stamp{font:700 13px 'Cinzel',serif;text-transform:uppercase;padding:3px 8px;border:2px solid;border-radius:4px;transform:rotate(-6deg)}.stamp.ok{color:#2f7d32}.stamp.no{color:#a8323a}
+.mbar{grid-column:1/-1;height:8px;border-radius:4px;background:#c8434b;overflow:hidden}.mbar i{display:block;height:100%;background:#3f8f5a}
+.mv{grid-column:1/-1;display:flex;justify-content:space-between;font-size:13px;font-weight:700}#scX{display:block;margin:12px auto 0}
 #tut{position:absolute;top:12px;left:12px;width:min(300px,calc(100% - 24px));background:var(--panel);border:2px solid #f2c23a;border-radius:12px;padding:10px 12px;z-index:3;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 #tut b{font:700 14px 'Cinzel',serif;display:block}#tut p{margin:4px 0 8px;font-size:14px;line-height:1.4}#tut button{min-height:34px;font-size:13px}
 @media(max-width:600px){#tut{top:auto;bottom:150px}}
@@ -308,6 +318,7 @@ body.landing-on .bar{display:none}
   </div>
  </div>
 
+ <div id="scroll" hidden role="dialog" aria-labelledby="scH"><div class="rod"></div><div class="paper"><p class="scD" id="scD"></p><h2 id="scH"></h2><div id="scBody"></div><button id="scX">Roll it up</button></div><div class="rod"></div></div>
  <aside id="tut" hidden><b id="tutT">Mayor Odo's welcome</b><p id="tutS"></p><div class="row"><button id="tutOk" class="primary" hidden>Got it</button><button id="tutSkip">Skip the tour</button></div></aside>
  <div id="acctM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="aH">
   <div class="card"><h2 id="aH">Your account</h2><div id="aBody"></div><p class="small" id="aMsg" role="status"></p><div class="row"><button id="ax">Close</button></div></div>
@@ -390,7 +401,7 @@ const scoreWord=sc=>sc>=700?'Excellent':sc>=600?'Good':sc>=500?'Fair':'Poor';
 const FISH=[{n:'Minnow',v:2,w:40,c:'#b8c4cc'},{n:'Perch',v:5,w:30,c:'#9bbf4a'},{n:'Trout',v:9,w:18,c:'#d98aa0'},{n:'Pike',v:16,w:9,c:'#6b8f5a'},{n:'Golden carp',v:45,w:3,c:'#f2c23a'}];
 const PRICE={house:60,char:30,building:0,bait:12,horse:150,feed:3,guard:8};
 const PETS=[{k:'cat',n:'Cat',p:40},{k:'dog',n:'Dog',p:50},{k:'chicken',n:'Chicken',p:25}];
-const st={guard:false,homeV:null,mem:{},wantedBy:{},savings:0,loan:0,repaid:0,defaults:0,insured:false,coins:40,bag:{},bait:0,treasury:100,tax:5,round:1,online:0,drift:0,lanterns:false,log:[],props:[],trials:[],weights:{},goodwill:0,builds:[],ledger:[],taxAcc:0,horse:false,pet:null,jail:null,joined:false};
+const st={peace:{},armour:0,sword:false,arms:0,raidedAt:{},guard:false,homeV:null,mem:{},wantedBy:{},savings:0,loan:0,repaid:0,defaults:0,insured:false,coins:40,bag:{},bait:0,treasury:100,tax:5,round:1,online:0,drift:0,lanterns:false,log:[],props:[],trials:[],weights:{},goodwill:0,builds:[],ledger:[],taxAcc:0,horse:false,pet:null,jail:null,joined:false};
 const bagCount=()=>Object.values(st.bag).reduce((a,b)=>a+b,0);
 
 /* ---------- economy: a self-balancing market ---------- */
@@ -499,7 +510,7 @@ const DPLOTS=[{x:34,y:3,w:4,h:3},{x:22,y:24,w:4,h:3}];
 const CELL={x:2,y:18,w:3,h:3},WB={x:6,y:15};
 // every village has its own layout: where the buildings, lake, square, farm and roads are
 // B order: town hall, Mira, Tobi, Juno, your house, architect, pub, bank, knight post
-const LAYOUTS={"Sempaladom":{"R":14,"fire":[20,15],"mkt":[15,15],"lake":[29,15,11,10,34,20.5,3.4,2.4],"stall":[32,15],"farm":[8,24],"stable":[26,15],"B":[[16,3],[5,8],[31,8],[5,18],[11,18],[25,8],[24,18],[11,9],[2,15]],"plots":[[34,3],[22,24]],"paths":[[20,9,20,22],[7,12,7,14],[33,12,33,14],[26,12,26,14],[7,22,28,23],[12,12,12,13],[3,14,3,14]],"trees":1,"seed":0},"Ye Old Town":{"R":12,"fire":[20,17],"mkt":[15,17],"lake":[1,14,12,11,6.5,20,4,2.8],"stall":[9,14],"farm":[24,24],"stable":[31,15],"B":[[3,3],[14,4],[22,4],[17,21],[11,21],[30,4],[25,18],[35,5],[34,13]],"plots":[[33,20],[26,14]],"paths":[[7,9,7,11],[16,8,16,11],[24,8,24,11],[31,8,31,11],[36,8,36,11],[20,13,20,14],[13,25,30,25],[19,20,19,24],[28,22,28,24],[35,15,35,15]],"trees":1.4,"seed":97},"Comradesbury":{"R":9,"fire":[20,14],"mkt":[15,13],"lake":[1,19,13,8,6.5,23.5,5,2.6],"stall":[10,17],"farm":[25,24],"stable":[31,4],"B":[[15,2],[3,11],[9,11],[27,11],[33,11],[26,3],[17,19],[9,4],[2,3]],"plots":[[29,18],[34,18]],"paths":[[20,10,20,10],[2,16,38,16],[23,17,23,22],[20,23,23,24],[13,17,13,18],[10,7,10,8],[27,7,27,8],[19,8,19,8],[24,23,30,23]],"trees":0.5,"seed":194},"Elsegoodom":{"R":10,"fire":[20,14],"mkt":[25,13],"lake":[0,21,40,6,20,25.5,18,3.4],"stall":[14,17],"farm":[2,12],"stable":[28,13],"B":[[16,2],[3,4],[27,4],[3,16],[9,16],[10,4],[25,16],[34,5],[33,12]],"plots":[[34,1],[21,17]],"paths":[[5,8,5,9],[11,8,11,9],[20,8,20,9],[29,8,29,9],[35,8,35,9],[2,20,38,20],[19,17,19,19],[15,19,15,19],[8,11,8,11],[32,11,32,14]],"trees":0.7,"seed":291},"Goatedom":{"R":20,"fire":[12,13],"mkt":[17,13],"lake":[26,1,13,10,32.5,5.5,5,3],"stall":[25,8],"farm":[23,22],"stable":[19,14],"B":[[3,2],[14,3],[27,13],[33,13],[3,22],[20,4],[10,22],[17,22],[2,14]],"plots":[[35,23],[9,16]],"paths":[[7,8,7,19],[16,8,16,19],[21,8,21,19],[29,17,29,19],[35,17,35,19],[2,26,20,26],[8,21,8,25],[18,25,18,26],[28,21,28,21],[25,10,25,19],[26,10,26,10]],"trees":1.3,"seed":388}};
+const LAYOUTS={"Sempaladom":{"R":14,"fire":[20,15],"mkt":[15,15],"lake":[29,15,11,10,34,20.5,3.4,2.4],"stall":[32,15],"farm":[8,24],"stable":[26,15],"B":[[16,3],[5,8],[31,8],[5,18],[11,18],[25,8],[24,18],[11,9],[2,15]],"plots":[[34,3],[22,24]],"paths":[[20,9,20,22],[7,12,7,14],[33,12,33,14],[26,12,26,14],[7,22,28,23],[12,12,12,13],[3,14,3,14]],"trees":1,"seed":0,"forge":[24,12]},"Ye Old Town":{"R":12,"fire":[20,17],"mkt":[15,17],"lake":[1,14,12,11,6.5,20,4,2.8],"stall":[9,14],"farm":[24,24],"stable":[31,15],"B":[[3,3],[14,4],[22,4],[17,21],[11,21],[30,4],[25,18],[35,5],[34,13]],"plots":[[33,20],[26,14]],"paths":[[7,9,7,11],[16,8,16,11],[24,8,24,11],[31,8,31,11],[36,8,36,11],[20,13,20,14],[13,25,30,25],[19,20,19,24],[28,22,28,24],[35,15,35,15]],"trees":1.4,"seed":97,"forge":[27,9]},"Comradesbury":{"R":9,"fire":[20,14],"mkt":[15,13],"lake":[1,19,13,8,6.5,23.5,5,2.6],"stall":[10,17],"farm":[25,24],"stable":[31,4],"B":[[15,2],[3,11],[9,11],[27,11],[33,11],[26,3],[17,19],[9,4],[2,3]],"plots":[[29,18],[34,18]],"paths":[[20,10,20,10],[2,16,38,16],[23,17,23,22],[20,23,23,24],[13,17,13,18],[10,7,10,8],[27,7,27,8],[19,8,19,8],[24,23,30,23]],"trees":0.5,"seed":194,"forge":[31,7]},"Elsegoodom":{"R":10,"fire":[20,14],"mkt":[25,13],"lake":[0,21,40,6,20,25.5,18,3.4],"stall":[14,17],"farm":[2,12],"stable":[28,13],"B":[[16,2],[3,4],[27,4],[3,16],[9,16],[10,4],[25,16],[34,5],[33,12]],"plots":[[34,1],[21,17]],"paths":[[5,8,5,9],[11,8,11,9],[20,8,20,9],[29,8,29,9],[35,8,35,9],[2,20,38,20],[19,17,19,19],[15,19,15,19],[8,11,8,11],[32,11,32,14]],"trees":0.7,"seed":291,"forge":[36,15]},"Goatedom":{"R":20,"fire":[12,13],"mkt":[17,13],"lake":[26,1,13,10,32.5,5.5,5,3],"stall":[25,8],"farm":[23,22],"stable":[19,14],"B":[[3,2],[14,3],[27,13],[33,13],[3,22],[20,4],[10,22],[17,22],[2,14]],"plots":[[35,23],[9,16]],"paths":[[7,8,7,19],[16,8,16,19],[21,8,21,19],[29,17,29,19],[35,17,35,19],[2,26,20,26],[8,21,8,25],[18,25,18,26],[28,21,28,21],[25,10,25,19],[26,10,26,10]],"trees":1.3,"seed":388,"forge":[23,11]}};
 const DOFF=[4,2,2,2,2,1,3,1,1];
 let LY=LAYOUTS.Sempaladom;
 const SPAWN=()=>({x:LY.fire[0]*T+8,y:(LY.fire[1]+3)*T+12});
@@ -518,7 +529,7 @@ function buildVillage(name,init){const l=LY=LAYOUTS[name]||LAYOUTS.Sempaladom,v=
  for(const b of B){rect(b.x-1,b.y-1,b.w+2,b.h+2,(x,y)=>keep[y][x]=true);rect(b.x,b.y,b.w,b.h,(x,y)=>v.solid[y][x]=true);path(b.door,b.y+b.h,b.door,b.y+b.h)}
  for(const p of DPLOTS){rect(p.x-1,p.y-1,p.w+2,p.h+2,(x,y)=>keep[y][x]=true);rect(p.x,p.y,p.w,p.h,(x,y)=>t[y][x]=5)}
  rect(K[0]-1,K[1]-1,5,8,(x,y)=>keep[y][x]=true);rect(K[0]+3,K[1]-1,3,3,(x,y)=>keep[y][x]=true);
- const [sx,sy]=l.stable;rect(sx-1,sy-1,4,5,(x,y)=>keep[y][x]=true);
+ const [sx,sy]=l.stable;rect(sx-1,sy-1,4,5,(x,y)=>keep[y][x]=true);const [gx,gy]=l.forge;rect(gx-1,gy-1,4,3,(x,y)=>keep[y][x]=true);
  rect(fx-5,fy-4,11,8,(x,y)=>keep[y][x]=true);
  const [Fx,Fy]=l.farm;rect(Fx-1,Fy,14,3,(x,y)=>{keep[y][x]=true;if(x>=Fx&&x<=Fx+11)t[y][x]=6});
  for(let y=0;y<VH;y++)for(let x=0;x<VW;x++){
@@ -526,7 +537,7 @@ function buildVillage(name,init){const l=LY=LAYOUTS[name]||LAYOUTS.Sempaladom,v=
   if(edge||(!keep[y][x]&&t[y][x]===0&&(((x<2||y<2||x>VW-3||y>VH-3)&&h<.65)||h<.06*l.trees))){t[y][x]=3;v.solid[y][x]=true}
   else if(!keep[y][x]&&t[y][x]===0&&h<.14)t[y][x]=4;
  }
- obj(v,'fire',fx,fy,1,1,true);obj(v,'wanted',WB.x,WB.y,1,1,true);obj(v,'sign',38,R-1,1,1,false);obj(v,'fishstall',l.stall[0],l.stall[1],3,2,true);obj(v,'hireboard',Fx-1,Fy,1,1,true);obj(v,'mktboard',l.mkt[0],l.mkt[1],1,1,true);obj(v,'stable',sx,sy,2,2,true);obj(v,'cell',CELL.x,CELL.y,3,3,false);
+ obj(v,'fire',fx,fy,1,1,true);obj(v,'wanted',WB.x,WB.y,1,1,true);obj(v,'sign',38,R-1,1,1,false);obj(v,'fishstall',l.stall[0],l.stall[1],3,2,true);obj(v,'hireboard',Fx-1,Fy,1,1,true);obj(v,'mktboard',l.mkt[0],l.mkt[1],1,1,true);obj(v,'stable',sx,sy,2,2,true);obj(v,'forge',gx,gy,1,1,true);obj(v,'cell',CELL.x,CELL.y,3,3,false);
  seat(v,fx-2,fy-1,'log',3);seat(v,fx-2,fy+1,'log',3);seat(v,fx+2,fy-1,'log',2);seat(v,fx+2,fy+1,'log',2);
  if(!init){endAllMeet();for(const [c,i] of sat){c.sit=null;if(i>=0&&v.seats[i])sitAt(c,v.seats[i])}placeNPCs()}}
 buildVillage('Sempaladom',true);
@@ -571,11 +582,12 @@ for(const [n,col,hair,sk] of [['Odette','#b05a8a','#2a1a10',1],['Bram','#5a7a3a'
 const marlo=npc('Marlo','#2f7fb8','#6b4a2a',skins[2],'village',null);Object.assign(marlo,{x:33.5*T,y:17*T+12,shop:'marlo'});
 const vera=npc('Vera','#e8823a','#2a1a10',skins[3],'village',null);Object.assign(vera,{x:28*T+8,y:12*T+12,shop:'vera'});
 const hilda=npc('Hilda','#7a3b5a','#c87a2a',skins[4],'tavern',null);Object.assign(hilda,{x:10.5*T,y:2*T+4,shop:'hilda'});
+const gunnar=npc('Gunnar','#5a4a44','#2a1a10',skins[2],'village',null);Object.assign(gunnar,{shop:'gunnar'});
 const pip=npc('Pip','#e8c547','#5a3a1a',skins[3],'village',null);Object.assign(pip,{x:27*T,y:17*T+12,shop:'pip'});
 // Sempaladom's knights: not villagers, so they never vote
 const POST={x:3*T+8,y:17*T+12};
 function placeNPCs(){const l=LY,a=B[5];POST.x=(l.B[8][0]+1)*T+8;POST.y=(l.B[8][1]+2)*T+12;
- Object.assign(marlo,{x:(l.stall[0]+1.5)*T,y:(l.stall[1]+2)*T+12});Object.assign(vera,{x:(a.x+3)*T+8,y:(a.y+4)*T+12});Object.assign(pip,{x:(l.stable[0]+1)*T,y:(l.stable[1]+2)*T+12});
+ Object.assign(marlo,{x:(l.stall[0]+1.5)*T,y:(l.stall[1]+2)*T+12});Object.assign(vera,{x:(a.x+3)*T+8,y:(a.y+4)*T+12});Object.assign(pip,{x:(l.stable[0]+1)*T,y:(l.stable[1]+2)*T+12});Object.assign(gunnar,{x:(l.forge[0]+1)*T+8,y:l.forge[1]*T+12,dir:2});
  if(typeof knightA!=='undefined'){Object.assign(knightA,{x:POST.x+16,y:POST.y,home:{x:POST.x+16,y:POST.y}});Object.assign(knightB,{x:10*T,y:l.R*T+12})}
  for(const c of chars)if(c.wander&&c.scene==='village'){const sp=SPAWN();c.x=sp.x-24+Math.random()*48;c.y=sp.y-8;c.tx=null}}
 const knightA=npc('Sir Aldric','#9aa4ad','#7d858c',skins[0],'village',null);Object.assign(knightA,{x:POST.x+16,y:POST.y,knight:true,home:{x:POST.x+16,y:POST.y}});
@@ -631,6 +643,10 @@ function lean(p){const gw=0;
  if(p.kind==='tax')return (p.data.rate<st.tax?.62:st.treasury<60?.55:.3)+gw;
  if(p.kind==='wage')return .5+gw;
  if(p.kind==='raid')return .45+gw;
+ if(p.kind==='peace')return .55+gw;
+ if(p.kind==='share')return .7+gw;
+ if(p.kind==='feast')return .65+gw;
+ if(p.kind==='arms')return .5+gw;
  if(p.kind==='build')return .55+gw;
  if(p.kind==='weight')return (p.data.dir<0?.3+(p.reason.length>25?.12:0):.6)+gw;return .5}
 function addProp(p){p.id=PID++;p.votes={};p.mine=null;const l=lean(p);
@@ -643,11 +659,11 @@ const roleProp=(role,reason)=>addProp({kind:'role',title:`Make ${player.display}
 const rateProp=(rate,by,reason)=>addProp({kind:'rate',title:`Set the bank's base rate to ${rate}% a day`,by,reason,cost:0,data:{rate}});
 const wageProp=(wage,by,reason)=>addProp({kind:'wage',title:`Fix farmhand wages at ${wage} coins a day`,by,reason,cost:0,data:{wage}});
 const taxProp=(rate,by,reason)=>addProp({kind:'tax',title:`Set the village tax to ${rate}%`,by,reason,cost:0,data:{rate}});
-const raidProp=(by,reason)=>addProp({kind:'raid',title:`Raid ${VN(RIVAL)}`,by,reason,cost:0,data:{}});
+const raidProp=(by,reason,target=RIVAL)=>addProp({kind:'raid',title:`Raid ${VN(target)}`,by,reason,cost:0,data:{target}});
 const weightProp=(who,dir,by,reason)=>addProp({kind:'weight',title:`${dir<0?'Lower':'Restore'} ${who==='You'?player.display:who}'s vote ${dir<0?'by':'by'} a quarter`,by,reason,cost:0,data:{who,dir}});
 function seedProps(){st.props=[];
  taxProp(pick(taxRates().filter(r=>r!==st.tax)),'Mayor Odo','The roads need fixing and the treasury will not fill itself.');
- raidProp('Rex',`${VN(RIVAL)} has been getting cocky. Let us take some of their gold.`);
+ {const ts=VILLAGES.map(v=>v.name).filter(n=>n!==PAL.name&&!raidBlock(n));if(ts.length){const t=pick(ts);raidProp('Rex',`${VN(t)} has been getting cocky. Let us take some of their gold.`,t)}}
  if(st.round===1)weightProp('Lu',-1,'Kofi','Lu keeps proposing silly things and never turns up to count the votes.');
  else if(Math.random()<.4){const lowered=voters().filter(n=>wOf(n)<1);if(lowered.length)weightProp(pick(lowered),1,'Mira','Everyone deserves a second chance.')}
  // a villager with a grudge asks the village to lower your vote
@@ -686,28 +702,41 @@ function renderVote(){$('vlaw').innerHTML=`<b>Village law:</b> ${esc(RULE().rule
   return `<div class="trial"><h3 style="margin:0">${name} on trial for ${esc(t.crime)}</h3><p class="by">Verdict at ${clockAt(t.ends)}. The suggestion with the most votes wins.${t.online?' Player votes are shown; villagers cast theirs when the trial closes.':''}${mine?' You can suggest a punishment but you cannot vote in your own trial.':''}</p>${mine&&st.jail&&st.jail.trial&&!st.jail.arresting?`<div class="flee"><p class="small"><b>Or run for it.</b> Break out of the cells and take the road to another village. You will be <b>wanted</b> there: a poster of you goes up and its knights will chase you on sight. If they catch you, you're tried again for fleeing.</p><button class="danger" data-flee>Break out and run</button></div>`:''}
   ${t.sugs.map((g,i)=>`<div class="sug"><div><b>${esc(g.t)}</b><div class="by">${esc(g.by)}: ${esc(g.reason)}</div></div><span class="w">${fmtW(sc[i])} votes</span>${mine?'':`<button data-trial="${t.id}" data-sug="${i}" aria-pressed="${t.mine===i}">Pick</button>`}</div>`).join('')}
   <div class="form"><select data-sugsel="${t.id}" aria-label="Punishment">${PUN.map((g,i)=>`<option value="${i}">${g.t}</option>`).join('')}</select><input data-sugwhy="${t.id}" maxlength="80" placeholder="Why? (optional)" aria-label="Reason"><button data-addsug="${t.id}">Suggest this punishment</button></div></div>`}).join('');
- $('props').innerHTML=st.props.length?st.props.map(p=>{const {y,n}=tally(p),sum=y+n||1;return `<div class="prop">${p.img?`<img class="thumbimg" src="${p.img}" alt="Design for ${esc(p.title)}">`:''}<div class="ph"><h3>${esc(p.title)}</h3><span class="cost">${p.cost?'Costs '+p.cost+' gold':'No cost'}</span></div>
+ $('props').innerHTML=st.props.length?st.props.map(p=>{const {y,n}=tally(p),sum=y+n||1;return `<div class="prop">${p.img?`<img class="thumbimg" src="${p.img}" alt="Design for ${esc(p.title)}">`:''}<div class="ph"><h3>${esc(p.title)}</h3><span class="cost">${p.cost?'Costs '+p.cost+' gold':'No cost'}</span></div>${p.kind==='raid'?'<p class="small down" style="margin:2px 0 4px">Everyone who agrees marches into battle at the meeting. The fallen lose the coins they carry.</p>':''}
   <p class="by">Proposed by ${esc(p.by==='You'?player.display:p.by)}${p.reason?': '+esc(p.reason):''}</p>
   <div class="meter"><i style="width:${Math.round(y/sum*100)}%"></i></div><div class="tally"><span class="up">Agree ${fmtW(y)}</span><span class="down">Disagree ${fmtW(n)}</span></div>
   <div class="ctl2"><button data-p="${p.id}" data-v="1" aria-pressed="${p.mine===true}">Agree</button><button data-p="${p.id}" data-v="0" aria-pressed="${p.mine===false}">Disagree</button></div></div>`}).join(''):'<p class="small">No proposals this round. Make one below.</p>';
  $('vlog').innerHTML=st.log.length?'<h3>Past results</h3>'+st.log.slice(0,8).map(l=>`<p><b>${typeof l.r==='number'?'Round '+l.r:esc(l.r)}.</b> ${esc(l.m.join(' '))}</p>`).join(''):'';renderNewProp()}
 function people(){const L=voters().map(n=>({key:n,label:n}));if(NET.ch){for(const r of NET.remotes.values())L.push({key:'u:'+r.id,label:r.name});L.push({key:'u:'+NET.uid,label:player.display+' (you)'})}else L.push({key:'You',label:player.display+' (you)'});return L}
-function renderNewProp(){const kind=$('npBody').dataset.kind||'tax',pp=people();
- $('npBody').innerHTML=`<div class="form"><select id="npKind" aria-label="Kind of proposal">${[['tax',RULE().minTax?'Change the commune share':'Change the village tax'],['rename','Rename the village'],...(RULE().fixedWage?[['wage','Set the farmhand wage']]:[]),['rate',"Set the bank's base rate"],['raid','Raid '+VN(RIVAL)],['lower',"Lower someone's vote"],['restore',"Restore someone's vote"]].map(([k,t])=>`<option value="${k}" ${k===kind?'selected':''}>${t}</option>`).join('')}</select>
+function renderNewProp(){const kind=$('npBody').dataset.kind||'tax',pp=people(),others=VILLAGES.filter(v=>v!==PAL).map(v=>v.name);
+ const kinds=[['tax',RULE().minTax?'Change the commune share':'Change the village tax'],['raid','Raid another village'],['peace','Make peace with a village'],['share','Share the treasury with residents'],['feast','Hold a feast in the square'],['arms','Arm the village guard'],['rate',"Set the bank's base rate"],...(RULE().fixedWage?[['wage','Set the farmhand wage']]:[]),['rename','Rename the village'],['lower',"Lower someone's vote"],['restore',"Restore someone's vote"]];
+ let extra='';
+ if(kind==='raid'){const opts=others.map(t=>{const why=raidBlock(t);return `<option value="${esc(t)}" ${why?'disabled':''}>${esc(VN(t))}${why?` (${why})`:''}</option>`});extra=`<select id="npTarget" aria-label="Which village">${opts.join('')}</select><p class="small down">Everyone who agrees marches into battle. The fallen lose the coins they carry; the losing village pays 20% of its treasury.</p>`}
+ else if(kind==='peace'){extra=`<select id="npTarget" aria-label="Which village">${others.map(t=>{const pz=peaceLeft(t);return `<option value="${esc(t)}" ${pz?'disabled':''}>${esc(VN(t))}${pz?` (already at peace for ${pz} more days)`:''}</option>`}).join('')}</select><p class="small">For 14 days neither village can raid the other.</p>`}
+ else if(kind==='share')extra=`<select id="npAmt" aria-label="How much each">${[5,10,20].map(a=>`<option value="${a}">${a} coins each</option>`).join('')}</select><p class="small">Paid from the treasury to everyone who lives here. If there isn't enough, everyone gets an equal smaller share.</p>`;
+ else if(kind==='feast')extra='<p class="small">Costs 60 gold from the treasury. Everyone who lives here gets merry, and every villager thinks a little better of them.</p>';
+ else if(kind==='arms')extra=st.arms>=3?'<p class="small">The village guard is already fully armed.</p>':`<p class="small">Level ${st.arms+1} costs ${(st.arms+1)*100} gold from the treasury. Every villager who marches and every guard who defends gets +0.5 strength per level.</p>`;
+ $('npBody').innerHTML=`<div class="form"><select id="npKind" aria-label="Kind of proposal">${kinds.map(([k,t])=>`<option value="${k}" ${k===kind?'selected':''}>${t}</option>`).join('')}</select>
+  ${extra}
+  ${kind==='rename'?`<input id="npName" maxlength="20" placeholder="New name for ${esc(VN(PAL.name))}" aria-label="New name">`:''}
   ${kind==='wage'?`<select id="npWage" aria-label="Wage">${[20,25,30,35,40,50].map(w=>`<option value="${w}">${w} coins a day${w===LAB.fixed?' (current)':''}</option>`).join('')}</select>`:''}
   ${kind==='rate'?`<select id="npBase" aria-label="Base rate">${[0.5,1,2,3].map(r=>`<option value="${r}">${r}% a day${r===ECO.rate?' (current)':''}</option>`).join('')}</select>`:''}
-  ${kind==='rename'?`<input id="npName" maxlength="20" placeholder="New name for ${esc(VN(PAL.name))}" aria-label="New name">`:''}
   ${kind==='tax'?`<select id="npRate" aria-label="Tax rate">${taxRates().map(r=>`<option value="${r}">${r}%${r===st.tax?' (current)':''}</option>`).join('')}</select>`:''}
   ${kind==='lower'||kind==='restore'?`<select id="npWho" aria-label="Whose vote">${pp.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}, vote ${fmtW(wOf(o.key))}</option>`).join('')}</select>`:''}
   <input id="npWhy" maxlength="120" placeholder="${kind==='lower'?'Why? Required, at least 10 characters':'Why? (optional)'}" aria-label="Reason">
-  <button class="primary" id="npGo">Put it to the vote</button><p class="small">Want a new building? Design one at Vera's studio and it comes here for a vote.</p></div>`}
+  <button class="primary" id="npGo">Put it to the vote</button><p class="small">Want a new building? Design one at Vera's studio and it comes here for a vote.</p></div>`;
+ if(kind==='raid'&&$('npTarget').selectedOptions[0]&&$('npTarget').selectedOptions[0].disabled){const ok=[...$('npTarget').options].find(o=>!o.disabled);if(ok)$('npTarget').value=ok.value}}
 $('npBody').addEventListener('change',e=>{if(e.target.id==='npKind'){$('npBody').dataset.kind=e.target.value;renderNewProp()}});
 $('npBody').addEventListener('click',async e=>{if(e.target.id!=='npGo')return;if(guest())return;const k=$('npKind').value,why=$('npWhy').value.trim();
  if(st.props.filter(p=>p.by==='You').length>=2){toast('You can make 2 proposals per round.');return}
- if(NET.ch){let kind=k,data={};if(k==='tax')data={rate:+$('npRate').value};else if(k==='rename')data={name:$('npName').value};else if(k==='rate')data={rate:+$('npBase').value};else if(k==='wage')data={wage:+$('npWage').value};else if(k==='lower'||k==='restore'){const key=$('npWho').value;kind='weight';data={who:key,dir:k==='lower'?-1:1,label:(people().find(o=>o.key===key)||{}).label?.replace(' (you)','')}}
+ if(NET.ch){let kind=k,data={};if(k==='tax')data={rate:+$('npRate').value};else if(k==='raid'||k==='peace')data={target:$('npTarget').value};else if(k==='share')data={amount:+$('npAmt').value};else if(k==='rename')data={name:$('npName').value};else if(k==='rate')data={rate:+$('npBase').value};else if(k==='wage')data={wage:+$('npWage').value};else if(k==='lower'||k==='restore'){const key=$('npWho').value;kind='weight';data={who:key,dir:k==='lower'?-1:1,label:(people().find(o=>o.key===key)||{}).label?.replace(' (you)','')}}
   const {error}=await NET.sb.rpc('propose',{p_kind:kind,p_data:data,p_reason:why,p_img:null});if(error){toast(error.message);return}await loadHall();toast('Your proposal is on the board.');return}
  if(k==='tax'){const r=+$('npRate').value;if(r===st.tax){toast(`The tax is already ${r}%.`);return}taxProp(r,'You',why)}
- else if(k==='raid')raidProp('You',why);
+ else if(k==='raid'){const t=$('npTarget').value,why2=raidBlock(t);if(!t||why2){toast(`${VN(t)} is ${why2}.`);return}raidProp('You',why,t)}
+ else if(k==='peace'){const t=$('npTarget').value;if(peaceLeft(t)){toast(`We are already at peace with ${VN(t)}.`);return}addProp({kind:'peace',title:`Sign a 14-day peace treaty with ${VN(t)}`,by:'You',reason:why,cost:0,data:{target:t}})}
+ else if(k==='share'){const a=+$('npAmt').value;addProp({kind:'share',title:`Give every resident ${a} coins from the treasury`,by:'You',reason:why,cost:0,data:{amount:a}})}
+ else if(k==='feast')addProp({kind:'feast',title:'Hold a feast in the square',by:'You',reason:why,cost:60,data:{}});
+ else if(k==='arms'){if(st.arms>=3){toast('The village guard is already fully armed.');return}addProp({kind:'arms',title:`Arm the village guard to level ${st.arms+1}`,by:'You',reason:why,cost:(st.arms+1)*100,data:{level:st.arms+1}})}
  else if(k==='rename'){const nm=$('npName').value.trim().replace(/\s+/g,' ');if(!/^[A-Za-z][A-Za-z' -]{2,19}$/.test(nm)){toast('Names must be 3 to 20 letters.');return}if(VILLAGES.some(v=>VN(v.name).toLowerCase()===nm.toLowerCase()||(v!==PAL&&v.name.toLowerCase()===nm.toLowerCase()))){toast('That name is taken.');return}addProp({kind:'rename',title:`Rename the village to ${nm}`,by:'You',reason:why,cost:0,data:{name:nm}})}
  else if(k==='wage')wageProp(+$('npWage').value,'You',why);
  else if(k==='rate'){const r=+$('npBase').value;if(r===ECO.rate){toast('That is already the rate.');return}rateProp(r,'You',why)}
@@ -719,7 +748,7 @@ $('vote').addEventListener('click',async e=>{const b=e.target.closest('button');
  if(d.stand){if(st.props.some(p=>p.kind==='role'&&p.by==='You')){toast('You are already standing for a role this round.');return}
   if(NET.ch){const r=await srv('propose',{p_kind:'role',p_data:{role:d.stand},p_reason:`I want to be your ${roleTitle(d.stand)}.`,p_img:null});if(r){await loadHall();toast('You are on the ballot. Rally some votes!')}}
   else{roleProp(d.stand,`I want to be your ${roleTitle(d.stand)}.`);renderVote();toast('You are on the ballot. Rally some votes!')}return}
- if(d.p){const p=st.props.find(x=>x.id===+d.p);if(p){const v=d.v==='1';p.mine=p.mine===v?null:v;renderVote();tut('vote');if(NET.ch){const {error}=await NET.sb.rpc('vote',{p_proposal:p.id,p_agree:p.mine});if(error)toast(error.message);loadHall()}}}
+ if(d.p){const p=st.props.find(x=>x.id===+d.p);if(p){const v=d.v==='1';p.mine=p.mine===v?null:v;renderVote();tut('vote');if(p.kind==='raid'&&p.mine===true)toast(`If the raid passes you march into battle with strength ${strOf(st.armour,st.sword)}. If you fall you lose the coins you carry, so bank your savings first. Gunnar the blacksmith sells armour.`);if(NET.ch){const {error}=await NET.sb.rpc('vote',{p_proposal:p.id,p_agree:p.mine});if(error)toast(error.message);loadHall()}}}
  else if(d.trial){const t=st.trials.find(x=>x.id===+d.trial);if(t){t.mine=t.mine===+d.sug?null:+d.sug;renderVote();if(NET.ch){const {error}=await NET.sb.rpc('trial_vote',{p_trial:t.id,p_sug:t.mine});if(error)toast(error.message);loadHall()}}}
  else if(d.addsug&&NET.ch){const idx=+$('vote').querySelector(`[data-sugsel="${d.addsug}"]`).value,why=$('vote').querySelector(`[data-sugwhy="${d.addsug}"]`).value.trim();const {error}=await NET.sb.rpc('suggest_punishment',{p_trial:+d.addsug,p_idx:idx,p_reason:why});if(error)toast(error.message);loadHall()}
  else if(d.addsug){const t=st.trials.find(x=>x.id===+d.addsug);if(!t)return;const g=PUN[+$('vote').querySelector(`[data-sugsel="${t.id}"]`).value],why=$('vote').querySelector(`[data-sugwhy="${t.id}"]`).value.trim()||'No reason given.';
@@ -732,15 +761,38 @@ function apply(p,m){
  else if(p.kind==='rename'){DISP[PAL.name]=p.data.name;village.label=p.data.name;setVilLabel();m.push(`The village is now called ${p.data.name}.`)}
  else if(p.kind==='rate'){ECO.rate=p.data.rate;m.push(`The bank's base rate is now ${p.data.rate}% a day.`)}
  else if(p.kind==='wage'){LAB.fixed=p.data.wage;m.push(`Farmhand wages are now fixed at ${p.data.wage} coins.`)}
+ else if(p.kind==='raid'&&soloRaid(p,m)){}
+ else if(p.kind==='peace'){st.peace[p.data.target]=ECO.time+14*1440;m.push(`We are at peace with ${VN(p.data.target)} for 14 days. Neither village can raid the other.`)}
+ else if(p.kind==='share'){const amt=Math.min(p.data.amount,Math.floor(st.treasury));st.treasury-=amt;st.coins+=amt;ledger('Shared with residents',-amt);m.push(`Every resident received ${amt} coins (${amt} gold in all).`)}
+ else if(p.kind==='feast'){if(st.treasury<60)m.push(`But the treasury only had ${Math.round(st.treasury)} gold.`);else{st.treasury-=60;ledger('Feast in the square',-60);player.merry=ECO.time+180;like(voters(),3);for(const c of chars)if(!c.isP&&!c.remote&&c.meeting){c.bubble=pick(['A feast!','Cheers!','Pass the bread!']);c.bt=performance.now()+3000}m.push('The feast was held! Everyone who lives here is merry, and the villagers think a little better of them.')}}
+ else if(p.kind==='arms'){if(st.treasury<p.cost)m.push(`But the treasury only had ${Math.round(st.treasury)} gold.`);else{st.treasury-=p.cost;st.arms=Math.max(st.arms,p.data.level);ledger('Armed the village guard',-p.cost);m.push(`Gunnar armed the village guard to level ${p.data.level}.`)}}
  else if(p.kind==='raid'){if(Math.random()<.55){st.treasury+=50;ledger(`Raid on ${VN(RIVAL)}`,50);m.push(`The raid on ${VN(RIVAL)} worked: +50 gold.`)}else{st.treasury=Math.max(0,st.treasury-30);ledger(`Failed raid on ${VN(RIVAL)}`,-30);m.push(`${VN(RIVAL)} fought back: -30 gold.`)}}
  else if(p.kind==='weight'){const w=Math.min(1,Math.max(.5,wOf(p.data.who)+.25*p.data.dir));st.weights[p.data.who]=w;m.push(`${p.data.who==='You'?player.display:p.data.who}'s vote is now ${fmtW(w)}.`)}
  else if(p.kind==='build'){if(p.cost>st.treasury){m.push(`"${p.data.name}" passed, but the treasury only had ${st.treasury} gold.`);return}if(!placeBuild(p)){m.push(`"${p.data.name}" passed, but there is no free plot left.`);return}st.treasury-=p.cost;ledger(`Built "${p.data.name}"`,-p.cost);m.push(`"${p.data.name}" has been built.`)}}
+function soloRaid(p,m){const T=(p.data&&p.data.target)||RIVAL,tv=VILLAGES.find(v=>v.name===T),tn=VN(T);
+ if(peaceLeft(T)){m.push(`But we are at peace with ${tn}, so the raid was called off.`);return true}
+ if(protLeft(T)){m.push(`But ${tn} was attacked less than 7 days ago, so the raid was called off.`);return true}
+ const F=[];for(const [n,yes] of Object.entries(p.votes)){const c=chars.find(x=>x.name===n);if(yes&&c&&!c.gone&&!c.fell&&!c.shop)F.push({n,c,s:1+st.arms*.5,side:0,m:c.purse??40,al:true})}
+ if(p.mine===true&&!st.fellToday)F.push({n:player.display,me:true,s:strOf(st.armour,st.sword),side:0,m:st.coins,al:true});
+ const na=F.length;if(!na){m.push('But nobody marched, so there was no raid.');return true}
+ const nd=5+Math.min(7,Math.floor(tv.tre/60));for(let i=0;i<nd;i++)F.push({n:'guard',g:true,s:1.25,side:1,m:15,al:true});
+ m.push(`Battle for ${tn}: ${na} of our knights against ${nd} of their guards.`);
+ for(;;){const A=F.filter(f=>f.al&&!f.side),Dd=F.filter(f=>f.al&&f.side);if(!A.length||!Dd.length)break;const a=pick(A),d=pick(Dd);if(Math.random()<a.s/(a.s+d.s))d.al=false;else a.al=false}
+ const won=F.some(f=>f.al&&!f.side),dead=F.filter(f=>!f.al),alive=F.filter(f=>f.al);let pot=0;
+ for(const f of dead){pot+=f.m;if(f.me){st.coins=0;st.fellToday=true;toast('You fell in battle and lost every coin you carried.')}else if(f.c){f.c.purse=0;f.c.fell=true}}
+ const fellN=dead.filter(f=>!f.g).map(f=>f.n),fg=dead.filter(f=>f.g).length;
+ if(fellN.length||fg)m.push('Fell in battle: '+fellN.concat(fg?[fg+' of their guards']:[]).join(', ')+'.');
+ const share=alive.length?Math.floor(pot/alive.length):0;
+ for(const f of alive){if(f.me)st.coins+=share;else if(f.c)f.c.purse=(f.c.purse??40)+share}
+ if(won){const loot=Math.floor(tv.tre*.2);tv.tre-=loot;st.treasury+=loot;ledger(`Won a raid on ${tn}`,loot);m.push(`Our knights won! ${tn} paid us ${loot} gold from its treasury.`)}
+ else{const loot=Math.floor(st.treasury*.2);st.treasury-=loot;tv.tre+=loot;ledger(`Lost a raid on ${tn}`,-loot);m.push(`${tn} held. Every one of our knights fell, and we paid them ${loot} gold.`)}
+ if(share>0)m.push(`The ${alive.length} knights left standing shared ${share} coins each from the fallen.`);
+ st.raidedAt[T]=ECO.time;hud();return true}
 function countVotes(){const m=[];
  if(!st.props.length)m.push('There was nothing to vote on.');
  for(const p of st.props){const {y,n}=tally(p),pass=y>n;m.push(`${p.title}: ${pass?'passed':'rejected'} (${fmtW(y)} to ${fmtW(n)}).`);if(pass)apply(p,m)}
- if(Math.random()<.25){st.treasury=Math.max(0,st.treasury-20);ledger(`${VN(RIVAL)} raided us`,-20);m.push(`Overnight, ${VN(RIVAL)} raided us and took 20 gold.`)}
  st.log.unshift({r:st.round,m});st.round++;seedProps();if(!$('vote').hidden)renderVote();hud();meetingResults(m)}
-$('closeVote').addEventListener('click',()=>toast(`Votes are counted at the town meeting on Day ${Math.floor(nextMeetT()/1440)+1} at 18:00. Every villager turns up.`));
+$('closeVote').addEventListener('click',()=>toast(`Votes are counted at the town meeting on Day ${Math.floor(nextMeetT()/1440)+1} at 18:00. Every villager gathers in the square.`));
 function voteTimer(){const b=$('closeVote'),ph=meetPhase();b.textContent=ph==='meet'?'The town meeting is on now!':ph==='gather'?'Town meeting today at 18:00':`Next town meeting: Day ${Math.floor(nextMeetT()/1440)+1} at 18:00`}
 setInterval(()=>{if(!$('vote').hidden)voteTimer()},1000);
 function openVote(){for(const k in K)K[k]=0;$('vote').hidden=false;renderVote();voteTimer();$('closeVote').focus({preventScroll:true})}
@@ -784,25 +836,25 @@ function openCrime(){if(modalOpen())return;const f=nearFields();let c=crimeTarge
  if(visiting()&&c&&!f){toast(`You're a guest in ${VN(PAL.name)}. Keep your hands off the people here.`);return}
  if(visiting())c=null;if(!c&&!f)return;for(const k in K)K[k]=0;
  const kn=Math.min(...[knightA,knightB].filter(k=>k.scene===player.scene).map(k=>Math.hypot(k.x-player.x,k.y-player.y)),9999)/T;
- $('qBody').innerHTML=`<p>${kn<10?'<b class="down">A knight is close by.</b> ':''}What are you up to?</p><div class="row" style="margin-top:6px">${c?`<button class="primary" data-crime="pick">Pickpocket ${esc(c.name)}</button><button data-crime="fight">Pick a fight with ${esc(c.name)}</button>`:''}${f?`<button ${c?'':'class="primary"'} data-crime="crops">Steal some crops from the ${visiting()?'local farm':'fields'}</button>`:''}</div>`;
+ $('qBody').innerHTML=`<p>${kn<10?'<b class="down">A knight is close by.</b> ':''}${player.merry>ECO.time?'<b>Dutch courage!</b> The beer makes you bolder (more likely to pull it off) but clumsier (easier to catch). ':''}What are you up to?</p><div class="row" style="margin-top:6px">${c?`<button class="primary" data-crime="pick">Pickpocket ${esc(c.name)}</button><button data-crime="fight">Pick a fight with ${esc(c.name)}</button>`:''}${f?`<button ${c?'':'class="primary"'} data-crime="crops">Steal some crops from the ${visiting()?'local farm':'fields'}</button>`:''}</div>`;
  $('qBody').dataset.who=c?c.name:'';$('crime').hidden=false;$('qx').focus({preventScroll:true})}
 $('qBody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$('crime').hidden=true;if(b.dataset.crime==='crops'){stealCrops();return}const c=chars.find(x=>x.name===$('qBody').dataset.who);if(c)doCrime(b.dataset.crime,c)});
 $('qx').addEventListener('click',()=>$('crime').hidden=true);
 async function stealCrops(){const near=[knightA,knightB].some(k=>k.scene===player.scene&&Math.hypot(k.x-player.x,k.y-player.y)<8*T);
  if(NET.ch){const r=await srv('crop_steal',{p_village:PAL.name,p_near:near});if(!r)return;
   toast(r.guarded?`A knight was guarding ${r.from}! You got nothing.`:`You stuffed ${r.got} wheat from ${r.from} into your bag.`);if(r.caught)arrest(r.crime);return}
- const guarded=visiting()&&Math.random()<.3,got=guarded?0:4+Math.floor(Math.random()*7),from=visiting()?'a local farm':'the village farms';
+ const merry=player.merry>ECO.time,guarded=visiting()&&Math.random()<.3,got=guarded?0:4+Math.floor(Math.random()*7)+(merry?3:0),from=visiting()?'a local farm':'the village farms';
  if(got){st.bag.Wheat=(st.bag.Wheat||0)+got;MK.wheat.stock=Math.max(30,MK.wheat.stock-got)}
  if(!visiting())like(voters(),-3);
- const caught=guarded?Math.random()<.85:Math.random()<.35+(near?.45:0)+(PAL.name==='Sempaladom'?.15:0);
+ const caught=guarded?Math.random()<.85:Math.random()<.35+(near?.45:0)+(PAL.name==='Sempaladom'?.15:0)+(merry?.15:0);
  toast(guarded?`A knight was guarding ${from}! You got nothing.`:`You stuffed ${got} wheat from ${from} into your bag.`);hud();saveProfile();if(caught)arrest(`stealing crops from ${from}`)}
 async function doCrime(kind,c){const now=performance.now(),near=[knightA,knightB].some(k=>k.scene===player.scene&&Math.hypot(k.x-player.x,k.y-player.y)<8*T);
  if(NET.ch){const r=await srv('crime',{p_kind:kind,p_target:c.name,p_near:near,p_inside:player.scene!=='village'});if(!r)return;
   if(kind==='pick'){if(r.ok&&r.got){toast(`You lifted ${r.got} coins from ${c.name}.`)}else{c.bubble='Hey! Hands off!';c.bt=now+3000;toast(`${c.name} felt your hand and pulled away.`)}}
   else{c.ko=now+40000;c.bubble='Ow!';c.bt=now+2500;toast(`You knocked ${c.name} out and grabbed ${r.got} coins.`)}
   if(r.caught)arrest(r.crime);return}
- const caught=Math.random()<(kind==='pick'?.3:.55)+(near?.45:0)+(RULE().catchBonus||0)+(player.scene!=='village'?-.15:0);c.purse??=Math.floor(rnd(20,90));
- if(kind==='pick'){if(Math.random()<.7){const got=Math.min(c.purse,Math.floor(rnd(3,13)));c.purse-=got;st.coins+=got;toast(`You lifted ${got} coins from ${c.name}.`)}else{c.bubble='Hey! Hands off!';c.bt=now+3000;toast(`${c.name} felt your hand and pulled away.`)}}
+ const merry=player.merry>ECO.time,caught=Math.random()<(kind==='pick'?.3:.55)+(near?.45:0)+(RULE().catchBonus||0)+(player.scene!=='village'?-.15:0)+(merry?.15:0);c.purse??=Math.floor(rnd(20,90));
+ if(kind==='pick'){if(Math.random()<(merry?.85:.7)){const got=Math.min(c.purse,Math.floor(rnd(3,13)));c.purse-=got;st.coins+=got;toast(`You lifted ${got} coins from ${c.name}.`)}else{c.bubble='Hey! Hands off!';c.bt=now+3000;toast(`${c.name} felt your hand and pulled away.`)}}
  else{c.ko=now+40000;c.bubble='Ow!';c.bt=now+2500;const got=Math.min(c.purse,5);c.purse-=got;st.coins+=got;toast(`You knocked ${c.name} out and grabbed ${got} coins.`)}
  like(voters().filter(n=>n!==c.name),-5);like([c.name],kind==='fight'?-50:-35);
  hud();saveProfile();if(caught)arrest(kind==='pick'?`pickpocketing ${c.name}`:`attacking ${c.name}`)}
@@ -821,6 +873,7 @@ const SHOP={
  marlo:{c:marlo,role:'Fishmonger',greet:'Fresh catch? I pay fair prices for anything from the lake.',log:[]},
  vera:{c:vera,role:'Architect',greet:'Welcome to my studio. Fancy a new look for your house, or for yourself?',log:[]},
  hilda:{c:hilda,role:'Landlady of the pub',greet:'What can I get you, love? Beer is brewed fresh from village wheat.',log:[]},
+ gunnar:{c:gunnar,role:'Blacksmith',greet:'Need something to keep you alive out there? Armour, swords, and gear for the village guard.',log:[]},
  pip:{c:pip,role:'Stable keeper',greet:'Looking for a loyal friend or a fast ride? You have come to the right place.',log:[]}
 };
 let curShop=null;const busy={};
@@ -834,6 +887,7 @@ function scripted(id,t){t=t.toLowerCase();
  if(/vote|hall|mayor|raid|tax/.test(t))return st.props.length?`The town hall is voting on "${propTitle()}". Everyone gets one vote, so go and use yours.`:'Nothing on the board right now. You could propose something!';
  if(/knight|arrest|crime|steal|jail|cell/.test(t))return 'The knights answer to Sempaladom. Get caught causing trouble and the whole village votes on what happens to you.';
  if(id==='hilda'){if(/beer|pint|drink|ale|price|cost/.test(t))return `A pint is ${beerPrice()} coins today. It follows the wheat price, so when wheat is dear, so is beer.`;if(/round/.test(t))return 'Buying a round makes friends fast. People remember who bought them a drink.';return pick(['Pull up a stool, love.','Best beer for miles, and that is a fact.','Quiet tonight. Shame, I like a busy bar.'])}
+ if(id==='gunnar'){if(/armou?r|plate|chain|leather|protect/.test(t))return 'Leather is 30 coins, chainmail 80, plate 180. Better armour means you are more likely to walk away from a battle.';if(/sword|blade|weapon/.test(t))return 'A good sword is 50 coins. It gives you an edge in a fight.';if(/raid|battle|war|fight/.test(t))return 'Vote for a raid and you march with it. The fallen lose the coins they carry, so keep your savings in the bank.';if(/guard|village|arms/.test(t))return 'For the right price I will arm the whole village guard. It helps everyone who marches, and everyone who defends.';return pick(['Mind the sparks.','Steel does not lie.','A knight is only as good as their armour.'])}
  if(id==='pip'){if(/horse|ride|fast/.test(t))return `A horse is ${PRICE.horse} coins, plus ${PRICE.feed} a day for feed. You will fly round the village.`;if(/pet|cat|dog|chicken/.test(t))return `Cats are ${PETS[0].p}, dogs ${PETS[1].p} and chickens ${PETS[2].p}. They follow you everywhere.`;return pick(['Every animal here is well looked after.','The chickens are cheap but the dog is loyal.','Fancy a horse? Saves your legs.'])}
  if(id==='marlo'){
   if(/bait/.test(t))return `Golden bait is ${PRICE.bait} coins for three casts. Fish bite faster and the rare ones come out.`;
@@ -856,7 +910,15 @@ $('sx').addEventListener('click',closeShop);
 $('sForm').addEventListener('submit',async e=>{e.preventDefault();const id=curShop;if(!id||busy[id])return;const inp=$('sIn'),t=inp.value.trim();if(!t)return;inp.value='';const s=SHOP[id];
  s.log.push({n:'You',t});const pend={n:s.c.name,t:'…',pending:true};s.log.push(pend);busy[id]=true;renderShopLog();
  const reply=await npcReply(id,t);s.log.splice(s.log.indexOf(pend),1);s.log.push({n:s.c.name,t:reply});if(s.log.length>40)s.log.splice(0,s.log.length-40);busy[id]=false;if(curShop===id)renderShopLog()});
+const ARMOUR=[{n:'No armour',p:0,b:0},{n:'Leather armour',p:30,b:.5},{n:'Chainmail',p:80,b:1},{n:'Plate armour',p:180,b:2}];
+const strOf=(a,sw)=>1+ARMOUR[a||0].b+(sw?.5:0);
 function renderShopBody(){const b=$('sBody');
+ if(curShop==='gunnar'){const vis=visiting(),armsP=(st.arms+1)*100;
+  b.innerHTML=`<h3 style="margin-top:0">Your gear</h3><p class="small">Battle strength: <b>${strOf(st.armour,st.sword)}</b> (a plain villager is 1). Each duel in a battle is won with the chance your strength ÷ both strengths.</p>
+  ${ARMOUR.slice(1).map((a,i)=>`<div class="item" style="margin-bottom:8px"><div><b>${a.n}</b><p class="small">+${a.b} strength. ${a.p} coins.</p></div>${st.armour>=i+1?'<span class="small">Owned</span>':`<button data-arm="${i+1}" ${vis||st.coins<a.p?'disabled':''}>Buy</button>`}</div>`).join('')}
+  <div class="item" style="margin-bottom:8px"><div><b>A sword</b><p class="small">+0.5 strength. 50 coins.</p></div>${st.sword?'<span class="small">Owned</span>':`<button data-swd ${vis||st.coins<50?'disabled':''}>Buy</button>`}</div>
+  <h3>Arm the village guard</h3><div class="item"><div><b>Guard level ${st.arms} of 3</b><p class="small">Every villager who marches, and every guard who defends ${esc(VN(PAL.name))}, gets +0.5 strength per level.${st.arms<3?` Next level: ${armsP} coins.`:''}</p></div>${st.arms<3?`<button data-vguard ${vis||st.coins<armsP?'disabled':''}>Pay for it</button>`:''}</div>
+  <p class="small">${vis?'Only locals can buy here.':`You have ${st.coins} coins. Keep savings in the bank: the fallen lose what they carry.`}</p>`;return}
  if(curShop==='marlo'){const rows=FISH.filter(f=>st.bag[f.n]),total=rows.reduce((s,f)=>s+st.bag[f.n]*fishPrice(f),0);
   b.innerHTML=`<h3 style="margin-top:0">Your catch</h3>`+(total?`<ul class="items">${rows.map(f=>`<li><span class="fishdot" style="background:${f.c}"></span><span>${f.n} × ${st.bag[f.n]}</span><span class="price">${fishPrice(f)} coins each</span><button data-sell="${f.n}">Sell 1</button></li>`).join('')}</ul><button class="primary wide" data-sellall>Sell everything for about ${total} coins</button><p class="small">Every fish you sell adds to supply, so prices dip as you sell and recover over time.</p>`:`<p class="small">No fish yet. Stand by the lake, press E to cast, and press E again the moment a "!" appears.</p>`)
   +`<h3>Bait</h3><div class="item"><div><b>Golden bait</b><p class="small">Your next 3 casts bite faster and catch rarer fish.${st.bait?` You have ${st.bait} left.`:''}</p></div><button data-bait>Buy for ${PRICE.bait} coins</button></div><h3>Price list</h3><p class="small">${fishPrices()} coins. You have ${st.coins} coins.</p>`}
@@ -868,6 +930,10 @@ function renderShopBody(){const b=$('sBody');
  else{b.innerHTML=`<h3 style="margin-top:0">Redesign your house</h3><div class="item"><canvas class="thumb" id="thHouse" width="80" height="64"></canvas><div><p class="small">Repaint every pixel of your house. ${PRICE.house} coins when you save.</p><button class="primary" data-ed="house">Open the editor</button></div></div><h3>Redesign your character</h3><div class="item"><canvas class="thumb tall" id="thChar" width="12" height="22"></canvas><div><p class="small">Draw a new outfit or a whole new look. ${PRICE.char} coins when you save.</p><button class="primary" data-ed="char">Open the editor</button></div></div><h3>Design a village building</h3><div class="item"><div><p class="small">Draw a new building for the village. It goes to the town hall, and if the village agrees and the treasury can afford 80 gold, it gets built on a free plot.</p><button data-ed="building">Start designing</button></div></div><p class="small">You have ${st.coins} coins. Earn more by fishing and selling to Marlo.</p>`;
   const h=$('thHouse').getContext('2d');h.fillStyle=PAL.grass[0];h.fillRect(0,0,80,64);h.drawImage(houseImage(),0,0);const c=$('thChar').getContext('2d');c.fillStyle=PAL.grass[0];c.fillRect(0,0,12,22);c.drawImage(charImage(player),0,0)}}
 $('sBody').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+ if('arm' in b.dataset||'swd' in b.dataset||'vguard' in b.dataset){const d=b.dataset,item=d.arm?'armour'+d.arm:'swd' in d?'sword':'arms',price=d.arm?ARMOUR[+d.arm].p:'swd' in d?50:(st.arms+1)*100;
+  if(NET.ch){b.disabled=true;const r=await srv('buy',{p_item:item});if(!r){renderShopBody();return}if(item==='arms')st.arms++}
+  else{if(st.coins<price)return;st.coins-=price;if(d.arm)st.armour=+d.arm;else if('swd' in d)st.sword=true;else st.arms++;like(['Gunnar'],5)}
+  toast(item==='arms'?'Gunnar sends a cart of steel to the village guard.':'Gunnar fits your new gear. You feel tougher already.');hud();renderShopBody();return}
  if(NET.ch&&!b.dataset.ed){const d=b.dataset;let r;b.disabled=true;
   if(d.sell){r=await srv('sell_fish',{p_name:d.sell});if(r){toast(`Sold a ${d.sell.toLowerCase()} for ${r.net} coins after tax.`);tut('sell')}}
   else if('sellall' in d){r=await srv('sell_fish',{p_name:null});if(r){toast(`Marlo paid you ${r.net} coins (${r.gross-r.net} went to the village in tax).`);tut('sell')}}
@@ -1013,7 +1079,12 @@ async function joinVillage(v){if(joining)return;st.homeV=v.name;const name=($('j
   joining=false;$('jMsg').textContent=''}
  st.joined=true;renderAcct();setVilLabel();$('join').hidden=true;document.body.classList.remove('landing-on');hud();setTimeout(tutStart,4200);
  toast(`Welcome to ${VN(v.name)}, ${name}. Fish at the lake, sell to Marlo, visit Vera the architect, or visit the town hall to vote.`)}
-async function loadNames(){if(!NET.sb)return;const {data}=await NET.sb.from('villages').select('name,display');for(const r of data||[]){if(r.display)DISP[r.name]=r.display;else delete DISP[r.name]}if(!st.joined)renderJoin()}
+const VINFO={};
+async function loadNames(){if(!NET.sb)return;const {data}=await NET.sb.from('villages').select('name,display,raided_at,peace');for(const r of data||[]){if(r.display)DISP[r.name]=r.display;else delete DISP[r.name];VINFO[r.name]={raided:r.raided_at?Date.parse(r.raided_at):0,peace:r.peace||{}}}if(!st.joined)renderJoin()}
+// why a village can't be raided right now ('' if it can). 1 game day = 3 real minutes online.
+function peaceLeft(t){if(NET.on){const u=Date.parse(((VINFO[PAL.name]||{}).peace||{})[t]||0)||0;return u>Date.now()?Math.ceil((u-Date.now())/180000):0}return st.peace[t]>ECO.time?Math.ceil((st.peace[t]-ECO.time)/1440):0}
+function protLeft(t){if(NET.on){const r=(VINFO[t]||{}).raided||0,left=r+21*60000-Date.now();return left>0?Math.ceil(left/180000):0}const r=st.raidedAt[t];return r!=null&&ECO.time-r<7*1440?Math.ceil((7*1440-(ECO.time-r))/1440):0}
+function raidBlock(t){const pz=peaceLeft(t);if(pz)return `at peace with us for ${pz} more day${pz>1?'s':''}`;const pr=protLeft(t);return pr?`protected for ${pr} more day${pr>1?'s':''}`:''}
 async function netJoin(v,name,visit){const sb=NET.sb;await loadNames().catch(()=>{});
  let {data:{session}}=await sb.auth.getSession();
  if(!session){const r=await sb.auth.signInAnonymously();if(r.error)throw new Error('Sign-in failed: '+r.error.message);session=r.data.session}
@@ -1073,6 +1144,7 @@ function applyServer(row,e){
   const H=a=>(Array.isArray(a)?a:[]).slice().reverse().map(Number);MK.wheat.hist=H(e.hw);MK.fish.hist=H(e.hf);LAB.hist=H(e.hl);
   ECO.news=(e.news||[]).map(n=>({d:+n.d,t:String(n.t)}));ECO.feed=(e.feed||[]).map(String);
   for(const [k,v] of Object.entries(e.trade||{}))if(TRADE[k])TRADE[k]={w:+v.w,f:+v.f};
+  const fl=e.fallen||{};for(const c of chars){if(c.isP||c.remote||c.knight||c.meeting)continue;const f=fl[c.name]!=null?(+fl[c.name])*60+480:0;if(f>ECO.time&&!c.gone&&!c.jailed)fallNpc(c,f);else if(c.gone&&f<=ECO.time&&!c.jailed){c.jailed=true;freeNpc(c)}}
   const jl=e.jailed||{};for(const c of chars){if(c.isP||c.remote||c.knight)continue;if(jl[c.name]!=null){if(!c.jailed)jailNpc(c)}else if(c.jailed)freeNpc(c)}
   if(NET.lastHour!=null&&e.hour>NET.lastHour){const n=Math.min(48,e.hour-NET.lastHour);for(let i=0;i<n;i++){ECO.time+=60;personalHour();if(ECO.time%1440===0)personalDay()}}
   ECO.time=e.hour*60+480;NET.lastHour=e.hour;
@@ -1088,7 +1160,7 @@ function applyServer(row,e){
   if(!$('bank').hidden)renderBank();if(!$('vote').hidden)renderVote()}
  hud()}
 function queueHall(){clearTimeout(NET.hallT);NET.hallT=setTimeout(loadHall,400)}
-async function loadHall(){if(!NET.ch)return;const sb=NET.sb;
+async function loadHall(){loadNames().catch(()=>{});if(!NET.ch)return;const sb=NET.sb;
  const {data:ps}=await sb.from('proposals').select('id,kind,title,by_name,by_user,reason,cost,data,img,npc_votes').eq('village',PAL.name).eq('round',st.round).order('id');
  const ids=(ps||[]).map(p=>p.id),{data:pv}=ids.length?await sb.from('pvotes').select('proposal_id,user_id,agree').in('proposal_id',ids):{data:[]};
  st.props=(ps||[]).map(p=>({id:p.id,kind:p.kind,title:String(p.title),by:p.by_user===NET.uid?'You':String(p.by_name),reason:String(p.reason||''),cost:+p.cost||0,data:p.data||{},img:typeof p.img==='string'&&p.img.startsWith('data:image/png')?p.img:null,votes:p.npc_votes||{},mine:null,others:[]}));
@@ -1103,7 +1175,7 @@ async function loadHall(){if(!NET.ch)return;const sb=NET.sb;
   st.trials.push(o)}
  if(!$('vote').hidden)renderVote()}
 async function srv(fn,args){const {data,error}=await NET.sb.rpc(fn,args||{});if(error){toast(error.message);return null}if(data&&data.me)applyMe(data.me);return data??{}}
-function applyMe(m){if(!m)return;st.guard=!!m.guard;if(!$('postM').hidden)renderPost();if(m.loyalty)LOY=Object.fromEntries(Object.entries(m.loyalty).map(([k,v])=>[k,+v]));st.savings=+m.savings||0;st.loan=+m.loan||0;st.repaid=+m.repaid||0;st.defaults=+m.defaults||0;st.insured=!!m.insured;st.score=m.score!=null?+m.score:null;if(!$('bank').hidden)renderBank();st.coins=+m.coins;st.bag=m.bag||{};st.bait=+m.bait||0;FARM.workers=+m.workers||0;FARM.grown=+m.grown||0;st.horse=!!m.horse;st.pet=m.pet||null;
+function applyMe(m){if(!m)return;st.guard=!!m.guard;st.armour=+m.armour||0;st.sword=!!m.sword;if(m.arms!=null)st.arms=+m.arms;if(m.merry!=null)player.merry=Math.max(player.merry||0,(+m.merry)*60+480);if(!$('postM').hidden)renderPost();if(m.loyalty)LOY=Object.fromEntries(Object.entries(m.loyalty).map(([k,v])=>[k,+v]));st.savings=+m.savings||0;st.loan=+m.loan||0;st.repaid=+m.repaid||0;st.defaults=+m.defaults||0;st.insured=!!m.insured;st.score=m.score!=null?+m.score:null;if(!$('bank').hidden)renderBank();st.coins=+m.coins;st.bag=m.bag||{};st.bait=+m.bait||0;FARM.workers=+m.workers||0;FARM.grown=+m.grown||0;st.horse=!!m.horse;st.pet=m.pet||null;
  if(m.jail==null){if(st.jail&&!st.jail.arresting){st.jail=null;release()}}else if(m.jail<0){if(!st.jail)st.jail={trial:true}}else st.jail={until:m.jail*60+480};
  hud();if(!$('shop').hidden)renderShopBody();if(!$('mkt').hidden)renderMarket()}
 async function refreshMe(){if(!NET.ch)return;const {data}=await NET.sb.rpc('my_state');if(data)applyMe(data)}
@@ -1244,7 +1316,7 @@ $('rpsBtn').addEventListener('click',openRps);
 $('rx').addEventListener('click',closeRps);
 
 /* ---------- Mayor Odo's tour ---------- */
-const TUT_STEPS=[['fish','Catch a fish: stand by the lake, press E to cast, then E again when you see "!".'],['sell','Sell your fish to Marlo at the fish stall by the lake.'],['market',"Check today's prices on the market board in the square."],['vote','Go to the town hall and agree or disagree with a proposal. Votes are counted at the town meeting every other day at 18:00, when the whole village turns up.'],['chat','Sit at the campfire and say hello.'],
+const TUT_STEPS=[['fish','Catch a fish: stand by the lake, press E to cast, then E again when you see "!".'],['sell','Sell your fish to Marlo at the fish stall by the lake.'],['market',"Check today's prices on the market board in the square."],['vote','Go to the town hall and agree or disagree with a proposal. Votes are counted at the town meeting in the square every other day at 18:00, when the whole village turns up.'],['chat','Sit at the campfire and say hello.'],
  ['ok','Shady business: walk up to any villager and press Q. You can pickpocket them for a few coins, or pick a fight, knock them out and take what they carry. Press Q by the fields to steal some crops.'],
  ['ok','Think twice. The knights of Sempaladom patrol every village, and they catch you far more often when one is close by. If you are caught you go to the cells, and the village votes on your punishment: a warning, a fine, jail, or even execution, which takes everything you own.'],
  ['ok','Villagers remember. The one you hurt turns against you and the rest grow wary. They vote against your proposals, can ask the village to lower your vote, and push for harsher punishments at your trial.'],
@@ -1254,7 +1326,7 @@ function tutStart(){try{if(localStorage.getItem('ideally-tour')==='done')return}
 function renderTut(){$('tut').hidden=!TUT.on;if(!TUT.on)return;$('tutT').textContent=`Mayor Odo's tour · ${TUT.i+1} of ${TUT_STEPS.length}`;$('tutS').textContent=TUT_STEPS[TUT.i][1];$('tutOk').hidden=TUT_STEPS[TUT.i][0]!=='ok'}
 function tutDone(){TUT.on=false;renderTut();try{localStorage.setItem('ideally-tour','done')}catch(e){}}
 function tut(ev){if(!TUT.on||TUT_STEPS[TUT.i][0]!==ev)return;TUT.i++;if(TUT.i>=TUT_STEPS.length){st.coins+=20;hud();saveProfile();tutDone();toast('Mayor Odo: You are a natural! Here are 20 coins to get you started.')}else{renderTut();if(ev!=='ok')toast(TUT_STEPS[TUT.i][0]==='ok'?'Nice! Mayor Odo has a few words of warning.':'Nice! Next: '+TUT_STEPS[TUT.i][1])}}
-$('tutSkip').addEventListener('click',tutDone);$('tutOk').addEventListener('click',()=>tut('ok'));
+$('tutSkip').addEventListener('click',tutDone);$('scX').addEventListener('click',()=>$('scroll').hidden=true);$('tutOk').addEventListener('click',()=>tut('ok'));
 
 /* ---------- ui helpers ---------- */
 function hud(){$('hCoin').textContent=st.coins;$('hFish').textContent=bagCount();$('hClock').textContent=clock();$('hOn').textContent=st.joined?st.online+'/20':'-'}
@@ -1288,7 +1360,7 @@ function findTarget(){const sc=scenes[player.scene],px=player.x,py=player.y;
  if(player.sit)return {label:'Press Enter to type, Esc to stand up',fn:()=>$('cIn').focus()};
  if(fish)return fish.phase==='bite'?{label:'A bite! Press now!',hot:true,fn:reel}:{label:'Waiting for a bite… press when you see !',fn:reel};
  if(sc===village){
-  for(const c of [marlo,vera,pip])if(Math.hypot(px-c.x,py-c.y)<28||c===marlo&&Math.hypot(px-(LY.stall[0]+1.5)*T,py-(LY.stall[1]+1)*T)<36)return {label:`Talk to ${c.name}, the ${SHOP[c.shop].role.toLowerCase()}`,fn:()=>openShop(c.shop)};
+  for(const c of [marlo,vera,pip,gunnar])if(Math.hypot(px-c.x,py-c.y)<28||c===marlo&&Math.hypot(px-(LY.stall[0]+1.5)*T,py-(LY.stall[1]+1)*T)<36)return {label:`Talk to ${c.name}, the ${SHOP[c.shop].role.toLowerCase()}`,fn:()=>openShop(c.shop)};
   if(Math.hypot(px-(LY.farm[0]-.5)*T,py-(LY.farm[1]+.5)*T)<26)return {label:'Farm office: hire farmhands',fn:()=>openMarket('farm')};
   if(Math.hypot(px-(LY.mkt[0]+.5)*T,py-(LY.mkt[1]+.5)*T)<26)return {label:'Check market prices',fn:()=>openMarket('market')};
   if(!visiting()&&px>LY.farm[0]*T&&px<(LY.farm[0]+4)*T&&py>LY.farm[1]*T&&py<(LY.farm[1]+3)*T+4)return FARM.grown>=1?{label:`Harvest ${Math.floor(FARM.grown)} wheat`,fn:harvest}:{label:FARM.workers?'Your crop is growing':'Your farm: hire farmhands at the farm office',fn:()=>openMarket('farm')};
@@ -1306,32 +1378,47 @@ const CYCLE=2880,MEET_T=2520; // ECO.time is minutes since day 1 00:00; day 2, 4
 const meetPhase=()=>{if(!st.joined)return null;const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;return t>=MEET_T-180&&t<MEET_T?'gather':t>=MEET_T&&t<MEET_T+60?'meet':null};
 const nextMeetT=()=>{const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;let m=ECO.time-t+MEET_T;if(m+60<=ECO.time)m+=CYCLE;return m};
 function leaderNpc(){const h=ROLES.leader;return chars.find(c=>!c.isP&&!c.remote&&c.name===(h&&!h.uid&&!h.you?h.name:'Mayor Odo'))}
-function meetingResults(m){MEETRES=m.slice(0,5);MEETLINE=0;toast('Town meeting: '+m.slice(0,2).join(' '))}
-function startMeet(c,spot,speaker){c.meeting={prev:{scene:c.scene,x:c.x,y:c.y,dir:c.dir,seat:c.sit},spot,speaker};if(c.sit){c.sit.who=null;c.sit=null}
+function meetingResults(m){MEETRES=m.slice(0,6);MEETLINE=0;showScroll(m);
+ // the raid's supporters put on helmets for the rest of the meeting; the fallen leave when it ends
+ const raid=st.props.find(p=>p.kind==='raid'),passed=m.some(x=>/^Raid .*: passed/.test(x));
+ if(raid&&passed){for(const c of chars)if(c.meeting&&!c.shop&&raid.votes&&raid.votes[c.name])c.raider=true;if(raid.mine===true)player.raider=true}
+ const fl=m.find(x=>x.startsWith('Fell in battle: '));if(fl)for(const n of fl.slice(16).replace(/\.$/,'').split(', ')){const c=chars.find(x=>x.name===n&&!x.isP&&!x.remote);if(c){if(c.meeting)c.fell=true;else fallNpc(c,ECO.time+1440)}}}
+function showScroll(m){if(!st.joined)return;const mo=[],bt=[],no=[];
+ for(const x of m){const r=/^(.*): (passed|rejected) \(([\d.]+) to ([\d.]+)\)\.$/.exec(x);
+  if(r)mo.push({t:r[1],ok:r[2]==='passed',y:+r[3],n:+r[4]});else if(/^(Battle for|Fell in battle|Our knights won|The \d+ knights left|But nobody marched|But .* attacked less than)/.test(x)||/ held\. /.test(x))bt.push(x);else no.push(x)}
+ const d=Math.floor(ECO.time/1440)+1;
+ $('scH').textContent=`Town meeting of ${VN(PAL.name)}`;$('scD').textContent=`Day ${d}`;
+ $('scBody').innerHTML=(mo.length?mo.map(x=>{const tot=x.y+x.n||1;return `<div class="motion"><div class="mt">${esc(x.t)}</div><span class="stamp ${x.ok?'ok':'no'}">${x.ok?'Passed':'Rejected'}</span>
+  <div class="mbar"><i style="width:${x.y/tot*100}%"></i></div><div class="mv"><span>For ${fmtW(x.y)}</span><span>Against ${fmtW(x.n)}</span></div></div>`}).join(''):'<p>There was nothing to vote on.</p>')+
+  (bt.length?`<h3>The battle</h3>${bt.map(x=>`<p>${esc(x)}</p>`).join('')}`:'')+(no.length?`<h3>Also</h3>${no.map(x=>`<p>${esc(x)}</p>`).join('')}`:'');
+ const sc=$('scroll');sc.hidden=false;sc.classList.remove('open');void sc.offsetWidth;sc.classList.add('open');clearTimeout(showScroll.t);showScroll.t=setTimeout(()=>sc.hidden=true,30000)}
+function startMeet(c,spot,speaker){c.raider=false;c.meeting={prev:{scene:c.scene,x:c.x,y:c.y,dir:c.dir,seat:c.sit},spot,speaker};if(c.sit){c.sit.who=null;c.sit=null}
  if(c.scene!=='village'){const b=B.find(b=>b.scene===c.scene);const p=b?{x:b.door*T+8,y:(b.y+b.h)*T+12}:SPAWN();c.x=p.x;c.y=p.y;c.scene='village'}c.tx=null}
-function endMeet(c){const p=c.meeting.prev;c.meeting=null;c.scene=p.scene;c.x=p.x;c.y=p.y;c.dir=p.dir;c.moving=false;if(p.seat&&!p.seat.who)sitAt(c,p.seat)}
+function endMeet(c){const p=c.meeting.prev;c.meeting=null;c.raider=false;c.scene=p.scene;c.x=p.x;c.y=p.y;c.dir=p.dir;c.moving=false;if(p.seat&&!p.seat.who)sitAt(c,p.seat);if(c.fell){c.fell=false;fallNpc(c,ECO.time+1440)}}
+function fallNpc(c,until){if(c.sit){c.prevSeat=c.sit;c.sit.who=null;c.sit=null}c.prev={scene:c.scene,x:c.x,y:c.y,wander:c.wander};c.gone=until;c.scene='gone'}
 function endAllMeet(){for(const c of chars)if(c.meeting)endMeet(c);MEETF=null}
+function bfsFrom(x0,y0){const D=grid(VW,VH,1e9);D[y0][x0]=0;const q=[[x0,y0]];
+ for(let i=0;i<q.length;i++){const [x,y]=q[i];for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+ax,ny=y+ay;if(nx<0||ny<0||nx>=VW||ny>=VH||village.solid[ny][nx]||D[ny][nx]<=D[y][x]+1)continue;D[ny][nx]=D[y][x]+1;q.push([nx,ny])}}return D}
 function meetTick(dt,now){const ph=meetPhase();
- if(!ph){if(MEETF){endAllMeet();MEETRES=null}return}
- if(!MEETF){const h=B[0],dx=h.door,dy=h.y+h.h,sp=[];
-  for(let y=dy+1;y<Math.min(VH-1,dy+8);y++)for(let x=Math.max(1,dx-6);x<=Math.min(VW-2,dx+6);x++)if(!village.solid[y][x])sp.push([x,y]);
-  sp.sort((a,b)=>Math.hypot(a[0]-dx,(a[1]-dy)*1.4)-Math.hypot(b[0]-dx,(b[1]-dy)*1.4));
-  MEETF=grid(VW,VH,1e9);MEETF[dy][dx]=0;const q=[[dx,dy]];
-  for(let i=0;i<q.length;i++){const [x,y]=q[i];for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+ax,ny=y+ay;if(nx<0||ny<0||nx>=VW||ny>=VH||village.solid[ny][nx]||MEETF[ny][nx]<=MEETF[y][x]+1)continue;MEETF[ny][nx]=MEETF[y][x]+1;q.push([nx,ny])}}
-  const nm=nextMeetT();if(MEETNOTE!==nm){MEETNOTE=nm;toast(ph==='gather'?`Town meeting at 18:00! Everyone in ${VN(PAL.name)} is heading to the town hall.`:'The town meeting is on at the town hall!')}
+ if(!ph){if(MEETF){endAllMeet();MEETRES=null;player.raider=false;st.fellToday=false}return}
+ if(!MEETF){const [fx,fy]=LY.fire,seats=new Set(village.seats.map(q=>q.x+','+q.y)),sp=[];
+  for(let y=fy-2;y<=fy+2;y++)for(let x=fx-4;x<=fx+4;x++)if(!village.solid[y][x]&&!seats.has(x+','+y))sp.push([x,y]);
+  sp.sort((a,b)=>(a[1]-b[1])||(Math.abs(a[0]-fx)-Math.abs(b[0]-fx)));MEETF=true;
+  const nm=nextMeetT();if(MEETNOTE!==nm){MEETNOTE=nm;toast(ph==='gather'?`Town meeting at 18:00! Everyone in ${VN(PAL.name)} is gathering in the square.`:'The town meeting is on in the square!')}
   const sk=leaderNpc();let i=0;
-  for(const c of chars){if(c.isP||c.remote||c.knight||c.jailed||c.gone||c.scene==='gone')continue;startMeet(c,c===sk?[dx,dy]:sp[i++%Math.max(1,sp.length)],c===sk);
-   if(ph==='meet'){c.x=c.meeting.spot[0]*T+8;c.y=c.meeting.spot[1]*T+12}}}
+  for(const c of chars){if(c.isP||c.remote||c.knight||c.jailed||c.gone||c.scene==='gone')continue;
+   const spot=c===sk?[fx,fy-3]:sp[i++%Math.max(1,sp.length)];startMeet(c,spot,c===sk);c.meeting.D=bfsFrom(spot[0],spot[1]);
+   if(ph==='meet'){c.x=spot[0]*T+8;c.y=spot[1]*T+12}}}
  for(const c of chars){if(!c.meeting)continue;if(c.jailed||c.gone){c.meeting=null;continue}
-  const [sx,sy]=c.meeting.spot,gx=sx*T+8,gy=sy*T+12;let tx=gx,ty=gy;const cx=Math.floor(c.x/T),cy=Math.floor((c.y-4)/T);
-  if(Math.hypot(gx-c.x,gy-c.y)>2.5*T&&MEETF[cy]&&MEETF[cy][cx]<1e9){let bd=MEETF[cy][cx],best=null;
-   for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+ax,ny=cy+ay;if(MEETF[ny]&&MEETF[ny][nx]<bd){bd=MEETF[ny][nx];best=[nx,ny]}}if(best){tx=best[0]*T+8;ty=best[1]*T+12}}
+  const [sx,sy]=c.meeting.spot,gx=sx*T+8,gy=sy*T+12,D=c.meeting.D;let tx=gx,ty=gy;const cx=Math.floor(c.x/T),cy=Math.floor((c.y-4)/T);
+  if(D[cy]&&D[cy][cx]>0&&D[cy][cx]<1e9){let bd=D[cy][cx],best=null;
+   for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+ax,ny=cy+ay;if(D[ny]&&D[ny][nx]<bd){bd=D[ny][nx];best=[nx,ny]}}if(best){tx=best[0]*T+8;ty=best[1]*T+12}}
   const ex=tx-c.x,ey=ty-c.y,d=Math.hypot(ex,ey);
-  if(d>1.5){const m=Math.min(d,56*dt);c.x+=ex/d*m;c.y+=ey/d*m;c.moving=true;c.dir=Math.abs(ex)>Math.abs(ey)?(ex>0?3:2):(ey>0?0:1)}
-  else{c.moving=false;c.dir=c.meeting.speaker?0:1}
+  if(d>1){const m=Math.min(d,56*dt);c.x+=ex/d*m;c.y+=ey/d*m;c.moving=true;c.dir=Math.abs(ex)>Math.abs(ey)?(ex>0?3:2):(ey>0?0:1)}
+  else{c.x=tx;c.y=ty;c.moving=false;c.dir=c.meeting.speaker?0:1}
   if(now>c.bt+600&&Math.random()<dt*(c.meeting.speaker?.6:.05)){
    if(c.meeting.speaker){c.bubble=ph==='gather'?pick(['Gather round, everyone!','The meeting starts at six.','Come on, find a spot!']):MEETRES?MEETRES[MEETLINE++%MEETRES.length]:pick(['Order! Order!','Welcome, everyone.','Let us count the votes!']);c.bt=now+3400}
-   else if(ph==='meet'||d<=1.5){c.bubble=pick(ph==='meet'?['Hear, hear!','Aye!','Nay!','About time.','What about the roads?','Shh!']:['Coming!','Is it six already?','Wait for me!']);c.bt=now+2200}}}}
+   else if(ph==='meet'||d<=1){c.bubble=pick(c.raider?['For the village!','To battle!','Charge!']:ph==='meet'?['Hear, hear!','Aye!','Nay!','About time.','What about the roads?','Shh!']:['Coming!','Is it six already?','Wait for me!']);c.bt=now+2200}}}}
 let target=null,lastLabel='';
 function act(){if(modalOpen())return;if(target)target.fn()}
 const K={up:0,down:0,left:0,right:0},KM={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
@@ -1351,7 +1438,8 @@ function update(dt,now){const sc=scenes[player.scene]||village,locked=modalOpen(
  if(fish&&(dx||dy)){fish=null;toast('You packed up your rod.')}
  player.moving=false;
  const riding=st.horse&&player.scene==='village'&&!player.sit;
- if(!player.sit&&(dx||dy)){const l=Math.hypot(dx,dy),sp=78*(riding?1.7:1)*dt,nx=player.x+dx/l*sp,ny=player.y+dy/l*sp;
+ if(!player.sit&&(dx||dy)){let mx=dx,my=dy;if(player.merry>ECO.time){const a=Math.sin(now/260)*.7+Math.sin(now/97)*.3,ca=Math.cos(a),sa=Math.sin(a);mx=dx*ca-dy*sa;my=dx*sa+dy*ca}
+  const l=Math.hypot(mx,my),sp=78*(riding?1.7:1)*(player.merry>ECO.time?.85:1)*dt,nx=player.x+mx/l*sp,ny=player.y+my/l*sp;
   if(!blocked(sc,nx,player.y)){player.x=nx;player.moving=true}if(!blocked(sc,player.x,ny)){player.y=ny;player.moving=true}
   player.dir=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:2):(dy>0?0:1);
   if(sc!==village&&player.y>(sc.h-1)*T+4)leave()}
@@ -1363,7 +1451,7 @@ function update(dt,now){const sc=scenes[player.scene]||village,locked=modalOpen(
     if(c.tx!=null){const ex=c.tx-c.x,ey=c.ty-c.y,d=Math.hypot(ex,ey);
      if(d<2){c.tx=null;c.wait=rnd(1,4);c.moving=false}
      else{const nx=c.x+ex/d*28*dt,ny=c.y+ey/d*28*dt;if(blocked(village,nx,ny)){c.tx=null;c.wait=rnd(.4,1.2)}else{c.x=nx;c.y=ny;c.moving=true;c.dir=Math.abs(ex)>Math.abs(ey)?(ex>0?3:2):(ey>0?0:1)}}}}}
-  if((c.wander||c.shop)&&player.scene==='village'&&Math.hypot(c.x-player.x,c.y-player.y)<40&&now>c.greet){c.bubble=c.shop==='marlo'?pick(['Fresh fish, fair prices!','Caught anything yet?','Pike are biting today.']):c.shop==='vera'?pick(['Fancy a new look?','Your roof could use some colour.','Come see my designs!']):pick(['Hey there!','Morning!','Nice day for a vote.','Seen the town hall board?']);c.bt=now+2600;c.greet=now+16000}}
+  if((c.wander||c.shop)&&player.scene==='village'&&Math.hypot(c.x-player.x,c.y-player.y)<40&&now>c.greet){c.bubble=c.shop==='marlo'?pick(['Fresh fish, fair prices!','Caught anything yet?','Pike are biting today.']):c.shop==='vera'?pick(['Fancy a new look?','Your roof could use some colour.','Come see my designs!']):c.shop==='gunnar'?pick(['Fresh steel today!','Armour saves lives.','Off to war? Come see me first.']):pick(['Hey there!','Morning!','Nice day for a vote.','Seen the town hall board?']);c.bt=now+2600;c.greet=now+16000}}
  if(now>nextTalk){const cand=chars.filter(c=>c!==player&&!c.remote&&c.scene===player.scene&&c.sit);
   if(cand.length){const c=pick(cand),g=groupOf(c);let line;do line=pick(LINES[kindOf(g)]);while(line===lastLine);lastLine=line;post(g,c,fill(line))}
   nextTalk=now+(curGroup?rnd(4000,7500):rnd(5500,9500))}
@@ -1458,6 +1546,8 @@ function objD(o,now){const X=o.x*T,Y=o.y*T,W=o.w*T,H=o.h*T,f=(now/120|0)%3;
  case 'wanted':{R('#5a3620',X+1,Y+6,2,10);R('#5a3620',X+13,Y+6,2,10);R('#8b5a33',X-1,Y-8,18,16);R('#6b4226',X-1,Y+6,18,2);
   WANTED.slice(0,2).forEach((w,i)=>{const px=X+(WANTED.length>1?i*8:4),c=w.col&&/^#[0-9a-f]{6}$/i.test(w.col)?w.col:'#888';R('#f2e3c6',px,Y-7,8,12);R('#c8434b',px,Y-7,8,2);R('#f0d2b6',px+2,Y-4,4,3);R('#3a2618',px+2,Y-5,4,1);R(c,px+1,Y-1,6,3);R('#3a2618',px+1,Y+3,6,1)});
   if(!WANTED.length){R('#f2e3c6',X+3,Y-6,10,6);R('#a89a8a',X+5,Y-4,6,1)}break}
+ case 'forge':{R('#3a3238',X-2,Y-10,12,14);R('#5a5058',X-2,Y-10,12,2);const g=((performance.now()/180)|0)%3;R(['#f28a2a','#f2c23a','#e8582a'][g],X+1,Y-4,6,4);R('#2a2228',X+8,Y-16,3,7);
+  R('#4a4a52',X+2,Y+6,12,4);R('#6a6a72',X+2,Y+6,12,1);R('#3a3a42',X+6,Y+10,4,5);break}
  case 'sign':R('#6b4226',X+7,Y+4,2,12);R('#8b5a33',X,Y+2,15,8);R('#a8734a',X,Y+2,15,2);R('#3a2a20',X+3,Y+5,8,1);R('#3a2a20',X+9,Y+4,1,3);break;
  case 'hireboard':case 'mktboard':R('rgba(0,0,0,.2)',X+2,Y+14,14,3);R('#6b4226',X+3,Y+6,2,10);R('#6b4226',X+11,Y+6,2,10);R('#8b5a33',X,Y-4,16,12);R('#f4ecd8',X+2,Y-2,12,8);
   if(o.type==='mktboard'){ctx.fillStyle='#2f8a3a';for(let i=0;i<5;i++)ctx.fillRect(X+3+i*2,Y+4-[2,4,3,6,5][i],1,[2,4,3,6,5][i])}else{R('#c9a227',X+4,Y,3,4);R('#c9a227',X+9,Y,3,4);R('#3a2a20',X+4,Y-1,3,1);R('#3a2a20',X+9,Y-1,3,1)}break;
@@ -1492,6 +1582,7 @@ function charD(c,now,noShadow){if(c.ko>now){ctx.save();ctx.translate(c.x,c.y-5);
  const hy=by-15;R(c.skin,x-4,hy,8,7);R(c.hair,x-4,hy-1,8,3);
  if(c.dir===1)R(c.hair,x-4,hy,8,6);else{R(c.hair,x-4,hy+2,1,2);R(c.hair,x+3,hy+2,1,2);const o=c.dir===2?-1:c.dir===3?1:0;R('#231a2a',x-2+o,hy+3,1,2);R('#231a2a',x+1+o,hy+3,1,2)}
  if(!c.knight)dress(c,x,by,hy);
+ if(c.raider||(c.isPm||c.isP)&&player.raider){R('#9aa4ad',x-5,hy-3,10,4);R('#7d858c',x-5,hy+1,10,1);R('#c8434b',x-1,hy-5,2,2);R('#b8c0c8',x-5,by-8,10,3)}
  if(c.knight){R('#c8434b',x-2,by-8,4,8);R('#b8c0c8',x-5,hy-2,10,5);R('#7d858c',x-5,hy+2,10,1);R('#d0d6dc',x-1,hy-4,2,2)}
  if(c.isP||c.isPm){const b=(now/300|0)%2;R('#ffe14d',x-2,hy-7-b,5,2);R('#ffe14d',x-1,hy-5-b,3,1);if(player.merry>ECO.time){R('#f2c23a',x+6,hy-1,4,5);R('#ffffff',x+6,hy-2,4,2);R('#c9a227',x+10,hy,1,3)}}}
 function crops(now){const g=FARM.grown/FARM.cap;
@@ -1544,7 +1635,7 @@ function draw(now){const sc=scenes[player.scene],vw=cv.width/S,vh=cv.height/S,mw
  if(sc===village){for(const b of doorsOf())txt(b.post&&PAL.name==='Sempaladom'?'Barracks':b===HOME&&visiting()?'Guest house':b.name,SX((b.x+b.w/2)*T),SY(b.y*T-(b.hall?18:3)),13);
   for(const [i,p] of DPLOTS.entries()){const bd=st.builds.find(b=>b.plot===i);txt(bd?bd.name:'Free plot',SX((p.x+p.w/2)*T),SY(bd?p.y*T-2:(p.y+p.h/2)*T-8),12)}
   txt('Cells',SX((CELL.x+1.5)*T),SY(CELL.y*T),12);txt('Stable',SX((LY.stable[0]+1)*T),SY(LY.stable[1]*T-2),12);
-  {const [Fx,Fy]=LY.farm;txt('Fishmonger',SX((LY.stall[0]+1.5)*T),SY(LY.stall[1]*T-2),12);txt(visiting()?'Local farm':'Your farm',SX((Fx+2)*T),SY(Fy*T-1),12);txt('Village farms',SX((Fx+8)*T),SY(Fy*T-1),12);txt('Farm office',SX((Fx-.5)*T),SY(Fy*T-5),12);txt('Market prices',SX((LY.mkt[0]+.5)*T),SY(LY.mkt[1]*T-5),12);txt('To other villages',SX(38.5*T),SY((LY.R-1)*T),12);if(WANTED.length)txt('Wanted',SX((WB.x+.5)*T),SY((WB.y-.8)*T),12,'#f28a7a')}}
+  {const [Fx,Fy]=LY.farm;txt('Fishmonger',SX((LY.stall[0]+1.5)*T),SY(LY.stall[1]*T-2),12);txt('Blacksmith',SX((LY.forge[0]+1)*T),SY(LY.forge[1]*T-12),12);txt(visiting()?'Local farm':'Your farm',SX((Fx+2)*T),SY(Fy*T-1),12);txt('Village farms',SX((Fx+8)*T),SY(Fy*T-1),12);txt('Farm office',SX((Fx-.5)*T),SY(Fy*T-5),12);txt('Market prices',SX((LY.mkt[0]+.5)*T),SY(LY.mkt[1]*T-5),12);txt('To other villages',SX(38.5*T),SY((LY.R-1)*T),12);if(WANTED.length)txt('Wanted',SX((WB.x+.5)*T),SY((WB.y-.8)*T),12,'#f28a7a')}}
  {const mine=myRoles();if(mine.length&&player.scene===sc.key&&!(player.bubble&&now<player.bt))txt(roleTitle(mine[0]),SX(player.x),SY(player.y-(player.sit?24:31)),12,'#f2d27a')}
  for(const c of chars)if(c.scene===sc.key&&!c.isP&&(c.remote||Math.hypot(c.x-player.x,c.y-player.y)<56)&&!(c.bubble&&now<c.bt))txt(c.name,SX(c.x),SY(c.y-(c.sit?22:26)),12);
  if(fish&&fish.phase==='bite')txt('!',SX(player.x),SY(player.y-28),26,'#ffe14d');
