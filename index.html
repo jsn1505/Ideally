@@ -180,6 +180,12 @@ body.seated #prompt{left:12px;transform:none;max-width:calc(100% - 380px)}
 body.landing-on .bar{display:none}
 @media(prefers-reduced-motion:reduce){.landing .vcard{transition:none}}
 /* tutorial */
+#battle{position:absolute;inset:0;z-index:7;background:rgba(10,8,14,.72);display:grid;place-items:center}#battle[hidden]{display:none}
+#battle .bwrap{width:min(960px,96%);background:var(--panel);border:3px solid #5a3620;border-radius:14px;padding:10px 12px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#battle .bhead,#battle .bfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 4px 8px}#battle .bfoot{margin:8px 4px 2px}
+#bTitle{font:700 22px 'Cinzel Decorative',serif}#bCount{font:700 14px 'Cinzel',serif}#bMsg{font:700 16px 'Cinzel',serif}
+#bcv{display:block;width:100%;image-rendering:pixelated;border-radius:8px;border:2px solid #3a2a20;background:#4c9631}
+.commence{display:block;margin:10px auto 2px;font-family:'Cinzel',serif}
 #scroll{position:absolute;left:50%;top:6%;transform:translateX(-50%);width:min(560px,92%);z-index:6;filter:drop-shadow(0 10px 24px rgba(0,0,0,.45))}
 #scroll .rod{height:20px;margin:0 -16px;border-radius:10px;background:linear-gradient(#a8734a,#5a3620 55%,#8b5a33);position:relative;z-index:1}
 #scroll .paper{background:linear-gradient(90deg,#e8d3a4,#f6e8c6 12%,#f6e8c6 88%,#e8d3a4);color:#3a2618;max-height:0;overflow:hidden;padding:0 26px;margin:-6px 0;transition:max-height 1.8s ease-out,padding 1.8s ease-out}
@@ -318,6 +324,7 @@ body.landing-on .bar{display:none}
   </div>
  </div>
 
+ <div id="battle" hidden role="dialog" aria-labelledby="bTitle"><div class="bwrap"><div class="bhead"><b id="bTitle"></b><span id="bCount"></span></div><canvas id="bcv" width="320" height="180"></canvas><div class="bfoot"><span id="bMsg"></span><span class="row"><button id="bFast">Faster</button><button id="bX">Return to the village</button></span></div></div></div>
  <div id="scroll" hidden role="dialog" aria-labelledby="scH"><div class="rod"></div><div class="paper"><p class="scD" id="scD"></p><h2 id="scH"></h2><div id="scBody"></div><button id="scX">Roll it up</button></div><div class="rod"></div></div>
  <aside id="tut" hidden><b id="tutT">Mayor Odo's welcome</b><p id="tutS"></p><div class="row"><button id="tutOk" class="primary" hidden>Got it</button><button id="tutSkip">Skip the tour</button></div></aside>
  <div id="acctM" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="aH">
@@ -358,7 +365,7 @@ const VILLAGES=[
 ];
 let PAL=VILLAGES[0],RIVAL='Ye Old Town';
 const DISP={};const VN=n=>DISP[n]||n;
-let MEETF=null,MEETNOTE=-1,MEETRES=null,MEETLINE=0;
+let MEETF=null,MEETNOTE=-1,MEETRES=null,MEETLINE=0,LASTBATS=[];
 // where you live vs where you are: visitors can walk, chat and fish, but only locals trade, bank and vote
 const visiting=()=>st.joined&&!!st.homeV&&PAL.name!==st.homeV;
 function setVilLabel(){const h=document.getElementById('hVil');if(h)h.textContent=visiting()?`${VN(PAL.name)} (visiting)`:VN(PAL.name)}
@@ -777,7 +784,7 @@ function soloRaid(p,m){const T=(p.data&&p.data.target)||RIVAL,tv=VILLAGES.find(v
  const na=F.length;if(!na){m.push('But nobody marched, so there was no raid.');return true}
  const nd=5+Math.min(7,Math.floor(tv.tre/60));for(let i=0;i<nd;i++)F.push({n:'guard',g:true,s:1.25,side:1,m:15,al:true});
  m.push(`Battle for ${tn}: ${na} of our knights against ${nd} of their guards.`);
- for(;;){const A=F.filter(f=>f.al&&!f.side),Dd=F.filter(f=>f.al&&f.side);if(!A.length||!Dd.length)break;const a=pick(A),d=pick(Dd);if(Math.random()<a.s/(a.s+d.s))d.al=false;else a.al=false}
+ const duels=[];for(;;){const A=F.filter(f=>f.al&&!f.side),Dd=F.filter(f=>f.al&&f.side);if(!A.length||!Dd.length)break;const a=pick(A),d=pick(Dd);const aw=Math.random()<a.s/(a.s+d.s);if(aw)d.al=false;else a.al=false;duels.push([F.indexOf(a),F.indexOf(d),aw?0:1])}
  const won=F.some(f=>f.al&&!f.side),dead=F.filter(f=>!f.al),alive=F.filter(f=>f.al);let pot=0;
  for(const f of dead){pot+=f.m;if(f.me){st.coins=0;st.fellToday=true;toast('You fell in battle and lost every coin you carried.')}else if(f.c){f.c.purse=0;f.c.fell=true}}
  const fellN=dead.filter(f=>!f.g).map(f=>f.n),fg=dead.filter(f=>f.g).length;
@@ -787,11 +794,11 @@ function soloRaid(p,m){const T=(p.data&&p.data.target)||RIVAL,tv=VILLAGES.find(v
  if(won){const loot=Math.floor(tv.tre*.2);tv.tre-=loot;st.treasury+=loot;ledger(`Won a raid on ${tn}`,loot);m.push(`Our knights won! ${tn} paid us ${loot} gold from its treasury.`)}
  else{const loot=Math.floor(st.treasury*.2);st.treasury-=loot;tv.tre+=loot;ledger(`Lost a raid on ${tn}`,-loot);m.push(`${tn} held. Every one of our knights fell, and we paid them ${loot} gold.`)}
  if(share>0)m.push(`The ${alive.length} knights left standing shared ${share} coins each from the fallen.`);
- st.raidedAt[T]=ECO.time;hud();return true}
-function countVotes(){const m=[];
+ st.raidedAt[T]=ECO.time;LASTBATS.push({target:T,tname:tn,won,fighters:F.map(f=>({n:f.n,k:f.me?'p':f.g?'g':'n',s:f.side,str:f.s,u:f.me?'You':null})),duels});hud();return true}
+function countVotes(){const m=[];LASTBATS=[];
  if(!st.props.length)m.push('There was nothing to vote on.');
  for(const p of st.props){const {y,n}=tally(p),pass=y>n;m.push(`${p.title}: ${pass?'passed':'rejected'} (${fmtW(y)} to ${fmtW(n)}).`);if(pass)apply(p,m)}
- st.log.unshift({r:st.round,m});st.round++;seedProps();if(!$('vote').hidden)renderVote();hud();meetingResults(m)}
+ st.log.unshift({r:st.round,m,b:LASTBATS});st.round++;seedProps();if(!$('vote').hidden)renderVote();hud();meetingResults(m,LASTBATS)}
 $('closeVote').addEventListener('click',()=>toast(`Votes are counted at the town meeting on Day ${Math.floor(nextMeetT()/1440)+1} at 18:00. Every villager gathers in the square.`));
 function voteTimer(){const b=$('closeVote'),ph=meetPhase();b.textContent=ph==='meet'?'The town meeting is on now!':ph==='gather'?'Town meeting today at 18:00':`Next town meeting: Day ${Math.floor(nextMeetT()/1440)+1} at 18:00`}
 setInterval(()=>{if(!$('vote').hidden)voteTimer()},1000);
@@ -1153,9 +1160,9 @@ function applyServer(row,e){
  if(row){st.tax=row.tax;st.treasury=row.treasury;st.weights=row.weights||{};
   if('display' in row&&(row.display||null)!==(DISP[PAL.name]||null)){if(row.display)DISP[PAL.name]=row.display;else delete DISP[PAL.name];setVilLabel();village.label=VN(PAL.name)}
   if(row.roles)for(const k of Object.keys(ROLES))if(row.roles[k])ROLES[k]={name:String(row.roles[k].name),uid:row.roles[k].uid||null};
-  st.ledger=(row.ledger||[]).map(l=>({d:+l.d,t:String(l.t),amt:+l.amt}));st.log=(row.log||[]).map(l=>({r:l.r,m:(l.m||[]).map(String)}));
+  st.ledger=(row.ledger||[]).map(l=>({d:+l.d,t:String(l.t),amt:+l.amt}));st.log=(row.log||[]).map(l=>({r:l.r,m:(l.m||[]).map(String),b:Array.isArray(l.b)?l.b:[]}));
   st.roundEnds=Date.parse(row.round_started)+(row.round_minutes||5)*60000;
-  if(row.round!==st.round){const fresh=st.round&&row.round>st.round;st.round=row.round;queueHall();if(fresh&&st.log[0])meetingResults(st.log[0].m)}
+  if(row.round!==st.round){const fresh=st.round&&row.round>st.round;st.round=row.round;queueHall();if(fresh&&st.log[0])meetingResults(st.log[0].m,st.log[0].b)}
   for(const b of row.builds||[])if(!st.builds.some(x=>x.plot===b.plot)&&typeof b.img==='string'&&b.img.startsWith('data:image/png')&&DPLOTS[b.plot]){const img=new Image();img.src=b.img;st.builds.push({plot:b.plot,name:String(b.name),img,by:String(b.by)});const pl=DPLOTS[b.plot];for(let y=pl.y;y<pl.y+pl.h;y++)for(let x=pl.x;x<pl.x+pl.w;x++)village.solid[y][x]=true}
   if(!$('bank').hidden)renderBank();if(!$('vote').hidden)renderVote()}
  hud()}
@@ -1326,12 +1333,42 @@ function tutStart(){try{if(localStorage.getItem('ideally-tour')==='done')return}
 function renderTut(){$('tut').hidden=!TUT.on;if(!TUT.on)return;$('tutT').textContent=`Mayor Odo's tour · ${TUT.i+1} of ${TUT_STEPS.length}`;$('tutS').textContent=TUT_STEPS[TUT.i][1];$('tutOk').hidden=TUT_STEPS[TUT.i][0]!=='ok'}
 function tutDone(){TUT.on=false;renderTut();try{localStorage.setItem('ideally-tour','done')}catch(e){}}
 function tut(ev){if(!TUT.on||TUT_STEPS[TUT.i][0]!==ev)return;TUT.i++;if(TUT.i>=TUT_STEPS.length){st.coins+=20;hud();saveProfile();tutDone();toast('Mayor Odo: You are a natural! Here are 20 coins to get you started.')}else{renderTut();if(ev!=='ok')toast(TUT_STEPS[TUT.i][0]==='ok'?'Nice! Mayor Odo has a few words of warning.':'Nice! Next: '+TUT_STEPS[TUT.i][1])}}
-$('tutSkip').addEventListener('click',tutDone);$('scX').addEventListener('click',()=>$('scroll').hidden=true);$('tutOk').addEventListener('click',()=>tut('ok'));
+$('tutSkip').addEventListener('click',tutDone);$('scX').addEventListener('click',()=>$('scroll').hidden=true);
+let SCBATS=[],BAT=null;
+$('scBody').addEventListener('click',e=>{const b=e.target.closest('[data-bat]');if(!b)return;const bt=SCBATS[+b.dataset.bat];if(bt){$('scroll').hidden=true;playBattle(bt)}});
+$('bX').addEventListener('click',()=>{$('battle').hidden=true;BAT=null});
+$('bFast').addEventListener('click',()=>{if(BAT){BAT.speed=BAT.speed>1?1:3;$('bFast').textContent=BAT.speed>1?'Normal speed':'Faster'}});
+function playBattle(b){const vt=VILLAGES.find(v=>v.name===b.target)||PAL,A=[],D=[];
+ const F=b.fighters.map((f,i)=>{let look;
+  if(f.k==='g')look={col:vt.hall,hair:'#3a2618',skin:skins[i%5],knight:true};
+  else if(f.k==='p'&&(f.u==='You'||(NET.uid&&f.u===NET.uid)))look={col:player.col,hair:player.hair,skin:player.skin,custom:player.custom||null,me:true,isP:true};
+  else{const c=(f.u&&NET.remotes.get(f.u))||chars.find(x=>x.name===f.n&&!x.isP);look=c?{col:c.col,hair:c.hair,skin:c.skin,custom:c.custom||null}:{col:'#8a8a8a',hair:'#3a2618',skin:skins[i%5]}}
+  const o=Object.assign({name:f.n,x:0,y:0,dir:+f.s?2:3,moving:false,sit:null,raider:!+f.s,ko:0,side:+f.s,alive:true},look);(+f.s?D:A).push(o);return o});
+ const place=(L,left)=>L.forEach((o,i)=>{const col=Math.floor(i/7),row=i%7;o.hx=left?92-col*18:228+col*18;o.hy=62+row*16;o.x=left?-30-col*18:350+col*18;o.y=o.hy});
+ place(A,true);place(D,false);
+ const g=vt.grass||PAL.grass,tiles=[];for(let y=0;y<12;y++)for(let x=0;x<20;x++)tiles.push(g[Math.floor(hash(x+7,y+3)*3)]);
+ BAT={b,F,A,D,k:-1,ph:'march',t:0,speed:1,last:performance.now(),tiles,path:vt.path||PAL.path};
+ $('bTitle').textContent=`Battle for ${b.tname||VN(b.target)}`;$('bMsg').textContent='The knights march out…';$('bFast').textContent='Faster';batCount();$('battle').hidden=false;requestAnimationFrame(batFrame)}
+function batCount(){const a=BAT.A.filter(o=>o.alive).length,d=BAT.D.filter(o=>o.alive).length;$('bCount').textContent=`Our knights: ${a} · Their guards: ${d}`}
+function batFrame(now){if(!BAT||$('battle').hidden)return;const B=BAT,dt=Math.min(.05,(now-B.last)/1000)*B.speed;B.last=now;B.t+=dt;
+ const mv=(o,tx,ty,sp)=>{const ex=tx-o.x,ey=ty-o.y,d=Math.hypot(ex,ey);if(d>.8){const m=Math.min(d,sp*dt);o.x+=ex/d*m;o.y+=ey/d*m;o.moving=true;if(Math.abs(ex)>.5)o.dir=ex>0?3:2}else{o.x=tx;o.y=ty;o.moving=false;o.dir=o.side?2:3}return d<=.8};
+ const duel=B.b.duels[B.k],a=duel&&B.F[duel[0]],d=duel&&B.F[duel[1]];
+ if(B.ph==='march'){let done=true;for(const o of B.F)if(!mv(o,o.hx,o.hy,70))done=false;if(done&&B.t>.6){B.k=0;B.ph=B.b.duels.length?'go':'end';B.t=0}}
+ else if(B.ph==='go'){const r1=mv(a,150,110,90),r2=mv(d,170,110,90);$('bMsg').textContent=`${a.name==='guard'||a.knight?'A guard':a.name} faces ${d.knight?'one of their guards':d.name}`;if(r1&&r2){B.ph='clash';B.t=0}}
+ else if(B.ph==='clash'){a.x=150+Math.sin(B.t*40)*1.5;d.x=170-Math.sin(B.t*40)*1.5;if(B.t>.55){const L=duel[2]?a:d,W=duel[2]?d:a;L.alive=false;L.ko=Infinity;L.x=150+Math.random()*30-5+(L===a?-10:10);L.y=96+Math.random()*44;L.moving=false;W.cheer=now+700;batCount();B.ph='back';B.t=0;B.win=W}}
+ else if(B.ph==='back'){if(mv(B.win,B.win.hx,B.win.hy,90)||B.t>1.4){B.k++;B.t=0;B.ph=B.k<B.b.duels.length?'go':'end'}}
+ else if(B.ph==='end'&&!B.ended){B.ended=true;const w=B.b.won;$('bMsg').textContent=w?'Victory! Our knights won the day.':`Defeat. ${B.b.tname||VN(B.b.target)} held.`;for(const o of B.F)if(o.alive&&(!!o.side!==!!w))o.cheer=Infinity}
+ const old=ctx;ctx=$('bcv').getContext('2d');ctx.imageSmoothingEnabled=false;
+ try{for(let i=0;i<B.tiles.length;i++){R(B.tiles[i],(i%20)*16,Math.floor(i/20)*16,16,16)}R(B.path,0,100,320,22);R(shade(B.path,-20),0,100,320,1);R(shade(B.path,-20),0,121,320,1);
+  const L=B.F.slice().sort((p,q)=>(p.alive?1:0)-(q.alive?1:0)||p.y-q.y);
+  for(const o of L){const bob=o.cheer>now?((now/120|0)%2)*2:0;o.y-=bob;charD(o,now);o.y+=bob}
+  if(B.ph==='clash'&&((now/70|0)%2)){R('#fff4b0',158,98,4,4);R('#ffd93d',156,102,2,2);R('#ffd93d',163,95,2,2)}}finally{ctx=old}
+ requestAnimationFrame(batFrame)}$('tutOk').addEventListener('click',()=>tut('ok'));
 
 /* ---------- ui helpers ---------- */
 function hud(){$('hCoin').textContent=st.coins;$('hFish').textContent=bagCount();$('hClock').textContent=clock();$('hOn').textContent=st.joined?st.online+'/20':'-'}
 let tt;function toast(s){const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3800)}
-const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden||!$('mkt').hidden||!$('rps').hidden||!$('bank').hidden||!$('crime').hidden||!$('acctM').hidden||!$('travel').hidden||!$('postM').hidden;
+const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden||!$('mkt').hidden||!$('rps').hidden||!$('bank').hidden||!$('crime').hidden||!$('acctM').hidden||!$('travel').hidden||!$('postM').hidden||!$('battle').hidden;
 
 /* ---------- fishing ---------- */
 let fish=null;
@@ -1378,19 +1415,19 @@ const CYCLE=2880,MEET_T=2520; // ECO.time is minutes since day 1 00:00; day 2, 4
 const meetPhase=()=>{if(!st.joined)return null;const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;return t>=MEET_T-180&&t<MEET_T?'gather':t>=MEET_T&&t<MEET_T+60?'meet':null};
 const nextMeetT=()=>{const t=((ECO.time%CYCLE)+CYCLE)%CYCLE;let m=ECO.time-t+MEET_T;if(m+60<=ECO.time)m+=CYCLE;return m};
 function leaderNpc(){const h=ROLES.leader;return chars.find(c=>!c.isP&&!c.remote&&c.name===(h&&!h.uid&&!h.you?h.name:'Mayor Odo'))}
-function meetingResults(m){MEETRES=m.slice(0,6);MEETLINE=0;showScroll(m);
+function meetingResults(m,bats){MEETRES=m.slice(0,6);MEETLINE=0;showScroll(m,bats);
  // the raid's supporters put on helmets for the rest of the meeting; the fallen leave when it ends
  const raid=st.props.find(p=>p.kind==='raid'),passed=m.some(x=>/^Raid .*: passed/.test(x));
  if(raid&&passed){for(const c of chars)if(c.meeting&&!c.shop&&raid.votes&&raid.votes[c.name])c.raider=true;if(raid.mine===true)player.raider=true}
  const fl=m.find(x=>x.startsWith('Fell in battle: '));if(fl)for(const n of fl.slice(16).replace(/\.$/,'').split(', ')){const c=chars.find(x=>x.name===n&&!x.isP&&!x.remote);if(c){if(c.meeting)c.fell=true;else fallNpc(c,ECO.time+1440)}}}
-function showScroll(m){if(!st.joined)return;const mo=[],bt=[],no=[];
+function showScroll(m,bats){if(!st.joined)return;bats=(bats||[]).filter(b=>b&&Array.isArray(b.fighters)&&Array.isArray(b.duels));SCBATS=bats;const mo=[],bt=[],no=[];
  for(const x of m){const r=/^(.*): (passed|rejected) \(([\d.]+) to ([\d.]+)\)\.$/.exec(x);
   if(r)mo.push({t:r[1],ok:r[2]==='passed',y:+r[3],n:+r[4]});else if(/^(Battle for|Fell in battle|Our knights won|The \d+ knights left|But nobody marched|But .* attacked less than)/.test(x)||/ held\. /.test(x))bt.push(x);else no.push(x)}
  const d=Math.floor(ECO.time/1440)+1;
  $('scH').textContent=`Town meeting of ${VN(PAL.name)}`;$('scD').textContent=`Day ${d}`;
  $('scBody').innerHTML=(mo.length?mo.map(x=>{const tot=x.y+x.n||1;return `<div class="motion"><div class="mt">${esc(x.t)}</div><span class="stamp ${x.ok?'ok':'no'}">${x.ok?'Passed':'Rejected'}</span>
   <div class="mbar"><i style="width:${x.y/tot*100}%"></i></div><div class="mv"><span>For ${fmtW(x.y)}</span><span>Against ${fmtW(x.n)}</span></div></div>`}).join(''):'<p>There was nothing to vote on.</p>')+
-  (bt.length?`<h3>The battle</h3>${bt.map(x=>`<p>${esc(x)}</p>`).join('')}`:'')+(no.length?`<h3>Also</h3>${no.map(x=>`<p>${esc(x)}</p>`).join('')}`:'');
+  (bt.length?`<h3>The battle</h3>${bt.map(x=>`<p>${esc(x)}</p>`).join('')}${bats.map((b,i)=>`<button class="primary commence" data-bat="${i}">Commence battle${bats.length>1?' for '+esc(b.tname||VN(b.target)):''}</button>`).join('')}`:'')+(no.length?`<h3>Also</h3>${no.map(x=>`<p>${esc(x)}</p>`).join('')}`:'');
  const sc=$('scroll');sc.hidden=false;sc.classList.remove('open');void sc.offsetWidth;sc.classList.add('open');clearTimeout(showScroll.t);showScroll.t=setTimeout(()=>sc.hidden=true,30000)}
 function startMeet(c,spot,speaker){c.raider=false;c.meeting={prev:{scene:c.scene,x:c.x,y:c.y,dir:c.dir,seat:c.sit},spot,speaker};if(c.sit){c.sit.who=null;c.sit=null}
  if(c.scene!=='village'){const b=B.find(b=>b.scene===c.scene);const p=b?{x:b.door*T+8,y:(b.y+b.h)*T+12}:SPAWN();c.x=p.x;c.y=p.y;c.scene='village'}c.tx=null}
