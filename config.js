@@ -4,6 +4,6 @@
 // Fill them in to play online. Both values are in Supabase > Project Settings > API.
 // The anon key is designed to be public: it is safe to commit. Never put the service_role key here.
 window.IDEALLY_CONFIG = {
-  supabaseUrl: "",      // e.g. "https://abcdefghijklm.supabase.co"
-  supabaseAnonKey: ""   // the long "anon public" key
+  supabaseUrl: "https://uurqbuztiqvzjgabtenk.supabase.com",      
+  supabaseAnonKey: "sb_publishable_OZsxIzWYE0Wdxxjb_TwAHQ_ZUrZ9wXW"   // the long "anon public" key
 };
