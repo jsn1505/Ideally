@@ -117,6 +117,26 @@ body.seated #prompt{left:12px;transform:none;max-width:calc(100% - 380px)}
 .pal button[aria-pressed=true]{outline:3px solid var(--ink);outline-offset:1px}
 #edCol{width:44px;height:32px;border:0;background:none;vertical-align:middle}
 #edPrev{image-rendering:pixelated;border-radius:8px;display:block;max-width:100%}
+.mktcard{width:min(900px,100%)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+.tile{border:2px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.tile .lab{font-size:13px;color:var(--muted);font-weight:800}
+.tile .big{font:700 28px/1.1 'Pixelify Sans',sans-serif}
+.tile .chg{font-size:13px;font-weight:800}
+.up{color:#2f8a3a}.down{color:#c8434b}
+.spark{display:block;width:100%;height:34px;margin-top:4px}
+.farmbox{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start}
+.farmbox p{margin:4px 0}
+.profit{font:700 20px 'Pixelify Sans',sans-serif}
+.news{list-style:none;padding:0;margin:0;font-size:14px}
+.news li{padding:6px 0;border-bottom:1px solid var(--line)}
+.news b{color:var(--muted);margin-right:6px}
+.moves{display:flex;flex-wrap:wrap;gap:8px}
+.moves button{min-width:96px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+.result{font:700 26px/1.2 'Pixelify Sans',sans-serif;margin:10px 0}
+#chat header button{padding:0 10px}
+@media(max-width:720px){.tiles{grid-template-columns:minmax(0,1fr)}.farmbox{grid-template-columns:minmax(0,1fr)}}
 /* join name */
 .namefield{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-weight:800;margin-top:12px}
 .namefield input{font:16px Nunito,sans-serif;padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);width:min(260px,100%)}
@@ -135,14 +155,14 @@ body.seated #prompt{left:12px;transform:none;max-width:calc(100% - 380px)}
 <body>
 <header class="bar">
  <div class="brandrow"><h1>Ideally</h1><span id="hVil">Choose a village</span></div>
- <div class="stats"><span class="coin">Coins <b id="hCoin">40</b></span><span>Fish <b id="hFish">0</b></span><span>Vote credits <b id="hCred">9</b></span><span>Treasury <b id="hTre">100</b></span><span>Online <b id="hOn">-</b></span></div>
+ <div class="stats"><span class="coin">Coins <b id="hCoin">40</b></span><span>Bag <b id="hFish">0</b></span><span id="hClock">Day 1 · 08:00</span><span>Vote credits <b id="hCred">9</b></span><span>Treasury <b id="hTre">100</b></span><span>Online <b id="hOn">-</b></span></div>
  <p class="help">Arrows or WASD to walk · E or Space to interact</p>
 </header>
 <main class="wrap">
  <canvas id="cv" aria-label="Pixel village game view"></canvas>
  <div id="prompt" role="button" tabindex="0" hidden></div>
  <aside id="chat" aria-label="Chat">
-  <header><div><span id="cTitle">Campfire</span><span id="cPill" class="pill">Public</span></div><button id="cClose">Stand up</button></header>
+  <header><div><span id="cTitle">Campfire</span><span id="cPill" class="pill">Public</span></div><button id="rpsBtn">Bet</button><button id="cClose">Stand up</button></header>
   <p id="cNote" class="note"></p>
   <ol id="cLog" class="log" aria-live="polite"></ol>
   <form id="cForm" class="say"><input id="cIn" maxlength="140" placeholder="Say something…" autocomplete="off" aria-label="Message"><button class="primary">Send</button></form>
@@ -197,6 +217,24 @@ body.seated #prompt{left:12px;transform:none;max-width:calc(100% - 380px)}
   </div>
  </div>
 
+ <div id="mkt" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mH">
+  <div class="card mktcard">
+   <h2 id="mH">Market and farm office</h2>
+   <p class="small">Prices and wages move with supply and demand every game hour. Village farmers hire, sell and fish at these prices, and they react to what you do.</p>
+   <div id="mBody"></div>
+   <div class="row"><button id="mx">Close</button></div>
+  </div>
+ </div>
+
+ <div id="rps" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rH">
+  <div class="card">
+   <h2 id="rH">Rock, paper, scissors</h2>
+   <p class="small">Bet in-game coins against someone at your table. The winner takes the stake and a draw returns it. Coins can't be cashed out.</p>
+   <div id="rBody"></div>
+   <div class="row"><button id="rx">Close</button></div>
+  </div>
+ </div>
+
  <div id="join" class="modal" role="dialog" aria-modal="true" aria-labelledby="jH">
   <div class="card joincard">
    <h2 id="jH" class="brand">Ideally</h2>
@@ -248,6 +286,50 @@ newRound();
 const spent=()=>st.active.reduce((s,id)=>s+(st.pv[id]||0)**2,0);
 const bagCount=()=>Object.values(st.bag).reduce((a,b)=>a+b,0);
 
+/* ---------- economy: a self-balancing market ---------- */
+const HOUR_MS=7500; // one game hour = 7.5 seconds, so a game day lasts 3 minutes
+const MK={wheat:{name:'Wheat',base:1.5,stock:300,target:300,eat:30,hist:[]},fish:{name:'Fish',base:1,stock:80,target:80,eat:4,sup:4,hist:[]}};
+const LAB={pool:34,base:34,wage:26,npc:29,hist:[]};
+const FARM={x:8,y:24,w:4,h:3,workers:0,grown:0,cap:120,perDay:30};
+const NPC_YIELD=24,MAXW=4;
+const ECO={time:8*60,acc:0,demand:1,demandDays:0,fishBoost:0,news:[]};
+const priceOf=g=>{const m=MK[g];return m.base*Math.min(3,Math.max(.3,m.target/Math.max(1,m.stock)))};
+const fishPrice=f=>Math.max(1,Math.round(f.v*priceOf('fish')));
+const wageNow=()=>Math.round(LAB.wage);
+const freeWorkers=()=>LAB.pool-LAB.npc-FARM.workers;
+function hourTick(silent){
+ const pw=priceOf('wheat'),profit=NPC_YIELD*pw-LAB.wage;
+ // village farmers hire while farming pays, and let workers go when it doesn't
+ if(profit>4&&freeWorkers()>0)LAB.npc++;else if(profit<0&&LAB.npc>0)LAB.npc--;
+ // wages: scarce workers push wages up, idle workers pull them down; nobody works below the cost of living
+ const free=freeWorkers();if(free<=2)LAB.wage*=1.02;else if(free>=7)LAB.wage*=.98;
+ LAB.wage=Math.max(10+6*pw,Math.min(120,LAB.wage));
+ // high wages draw workers in from other villages, low wages send them away
+ const want=Math.round(LAB.base*Math.pow(LAB.wage/26,.6));if(LAB.pool<want)LAB.pool++;else if(LAB.pool>want&&LAB.pool>LAB.npc+FARM.workers)LAB.pool--;
+ // wheat: village farms supply it, villagers eat less of it when it is dear
+ const w=MK.wheat;w.stock=Math.max(30,w.stock+LAB.npc-w.eat*ECO.demand*Math.pow(1.5/pw,.7)*(.9+Math.random()*.2));
+ const f=MK.fish;f.stock=Math.max(10,f.stock+f.sup*(ECO.fishBoost?2:1)*(.8+Math.random()*.4)-f.eat+(f.target-f.stock)*.03);
+ FARM.grown=Math.min(FARM.cap,FARM.grown+FARM.workers*FARM.perDay/24);
+ for(const [arr,v] of [[MK.wheat.hist,priceOf('wheat')],[MK.fish.hist,priceOf('fish')],[LAB.hist,LAB.wage]]){arr.push(v);if(arr.length>48)arr.shift()}
+ if(!silent&&!$('mkt').hidden)renderMarket()}
+const EVENTS=[
+ ()=>{ECO.demand=1.4;ECO.demandDays=2;return `${RIVAL}'s harvest failed and they are buying our wheat. Prices are climbing.`},
+ ()=>{ECO.demand=.75;ECO.demandDays=2;return 'A grain caravan rolled in and flooded the market. Wheat will be cheap for a while.'},
+ ()=>{ECO.fishBoost=1;return 'A huge shoal reached the lake. Fishermen are landing plenty, so fish prices are sliding.'},
+ ()=>{MK.fish.stock=Math.max(20,MK.fish.stock-25);return 'A feast at the town hall emptied the fish stalls. Fish prices jumped.'}];
+function news(t){ECO.news.unshift({d:dayNum(),t});if(ECO.news.length>8)ECO.news.pop();toast(t)}
+const dayNum=()=>Math.floor(ECO.time/1440)+1;
+const clock=()=>`Day ${dayNum()} · ${String(Math.floor(ECO.time%1440/60)).padStart(2,'0')}:00`;
+function newDay(){
+ if(FARM.workers){const w=wageNow(),cost=w*FARM.workers;
+  if(st.coins>=cost){st.coins-=cost;toast(`Midnight: you paid your ${FARM.workers} farmhand${FARM.workers>1?'s':''} ${cost} coins (${w} each).`)}
+  else{const keep=Math.floor(st.coins/w),gone=FARM.workers-keep;FARM.workers=keep;st.coins-=keep*w;toast(`You couldn't cover wages of ${w} each, so ${gone} farmhand${gone>1?'s':''} quit.`)}
+  hud();saveProfile()}
+ if(ECO.demandDays>0&&--ECO.demandDays===0)ECO.demand=1;
+ if(ECO.fishBoost>0)ECO.fishBoost--;
+ if(Math.random()<.35)news(pick(EVENTS)())}
+for(let i=0;i<36;i++)hourTick(true);
+
 /* ---------- scenes ---------- */
 function mkScene(key,label,w,h,fill){return {key,label,w,h,tiles:grid(w,h,fill),solid:grid(w,h,false),objs:[],seats:[]}}
 function obj(s,type,x,y,w,h,solid,extra){s.objs.push(Object.assign({type,x,y,w,h},extra));if(solid)for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)s.solid[j][i]=true}
@@ -276,12 +358,13 @@ const PLOTS={
  for(const b of B){rect(b.x-1,b.y-1,b.w+2,b.h+2,(x,y)=>keep[y][x]=true);rect(b.x,b.y,b.w,b.h,(x,y)=>v.solid[y][x]=true)}
  for(const p of Object.values(PLOTS)){rect(p.x-1,p.y-1,p.w+2,p.h+2,(x,y)=>keep[y][x]=true);rect(p.x,p.y,p.w,p.h,(x,y)=>t[y][x]=5)}
  rect(15,11,11,8,(x,y)=>keep[y][x]=true);
+ rect(7,24,14,3,(x,y)=>{keep[y][x]=true;if(x>=8&&x<=19)t[y][x]=6});
  for(let y=0;y<VH;y++)for(let x=0;x<VW;x++){
   const edge=x===0||y===0||x===VW-1||y===VH-1,h=hash(x,y);
   if(edge||(!keep[y][x]&&t[y][x]===0&&(((x<2||y<2||x>VW-3||y>VH-3)&&h<.65)||h<.06))){t[y][x]=3;v.solid[y][x]=true}
   else if(!keep[y][x]&&t[y][x]===0&&h<.14)t[y][x]=4;
  }
- obj(v,'fire',20,15,1,1,true);obj(v,'sign',38,13,1,1,false);obj(v,'fishstall',32,15,3,2,true);
+ obj(v,'fire',20,15,1,1,true);obj(v,'sign',38,13,1,1,false);obj(v,'fishstall',32,15,3,2,true);obj(v,'hireboard',7,24,1,1,true);obj(v,'mktboard',15,15,1,1,true);
  seat(v,18,14,'log',3);seat(v,18,16,'log',3);seat(v,22,14,'log',2);seat(v,22,16,'log',2);
 }
 function mkRoom(key,label,w,h,o){const s=mkScene(key,label,w,h,10);Object.assign(s,o);s.exitX=Math.floor(w/2);
@@ -327,12 +410,12 @@ const vera=npc('Vera','#e8823a','#2a1a10',skins[3],'village',null);Object.assign
 /* ---------- village chat ---------- */
 const LINES={
  house:['Nobody outside can read this, right?','Between us, I am voting for "{p}".','Did you see who moved in by the pond?','I think {r} is planning something.','Tea is still warm if you want some.','My plan: save credits now, spend big next round.','Honestly the mayor talks too much.'],
- campfire:['Evening, everyone!','Fire is nice tonight.','Anyone heading to the town hall later?','"{p}" would bring more people here.','Marlo paid me 16 coins for a pike today!','Vera redid my roof. Worth every coin.','I heard {r} has a bigger treasury than us.','Treasury is at {t} gold. Not bad.'],
+ campfire:['Evening, everyone!','Fire is nice tonight.','Anyone heading to the town hall later?','"{p}" would bring more people here.','Marlo paid me 16 coins for a pike today!','Vera redid my roof. Worth every coin.','I heard {r} has a bigger treasury than us.','Treasury is at {t} gold. Not bad.','Wheat is {w} coins a bushel today. Can you believe it?','Farmhands want {wg} coins a day now.','I am holding my wheat until the price goes up.'],
  hall:['Read the board before you vote.','Quadratic voting means whales cannot buy everything.','Each extra vote costs more. Spread them out.','I am putting three votes on "{p}".','Treasury is at {t} gold. Spend it wisely.','Order, order! The board is open.'],
  tavern:['Best seat in the village.','Whoever voted for this place: legend.','Another round for the table!','We should invite {r} over. Or raid them.','I can hear the pond from here.']
 };
 const REPLY={gen:['Ha, true.','Agreed!','Hmm, not sure about that.','Tell me more.','That is what I said yesterday!','Good point.'],q:['Good question. Ask the mayor?','No idea, honestly.','Probably yes!','I hope not.'],vote:['I am leaning towards "{p}".','Remember, the 3rd vote costs 9 credits.','Go to the town hall, the board is up.']};
-const fill=s=>s.replace('{p}',P[pick(st.active)].t).replace('{t}',st.treasury).replace('{r}',RIVAL);
+const fill=s=>s.replace('{p}',P[pick(st.active)].t).replace('{t}',st.treasury).replace('{r}',RIVAL).replace('{w}',priceOf('wheat').toFixed(2)).replace('{wg}',wageNow());
 const chats={};let curGroup=null,nextTalk=0,lastEarn=-1e9,earnToasts=0,lastLine='';
 const groupOf=c=>c.scene==='village'?'campfire':c.scene;
 const kindOf=g=>g==='campfire'?'campfire':scenes[g].kind;
@@ -397,10 +480,10 @@ const SHOP={
  vera:{c:vera,role:'Architect',greet:'Welcome to my studio. Fancy a new look for your house, or for yourself?',log:[]}
 };
 let curShop=null;const busy={};
-const fishPrices=()=>FISH.map(f=>`${f.n} ${f.v}`).join(', ');
+const fishPrices=()=>FISH.map(f=>`${f.n} ${fishPrice(f)}`).join(', ');
 function facts(id){const bag=FISH.filter(f=>st.bag[f.n]).map(f=>`${st.bag[f.n]} ${f.n}`).join(', ')||'no fish';
  const common=`Village: ${PAL.name}. Neighbouring rival village: ${RIVAL}. Village treasury: ${st.treasury} gold. Proposals on the town hall board: ${st.active.map(i=>P[i].t).join('; ')}. The player has ${st.coins} coins and ${bag}.`;
- return id==='marlo'?`You run the fish stall beside the lake. You pay players these prices in coins: ${fishPrices()}. You sell golden bait for ${PRICE.bait} coins: the next 3 casts bite faster and catch rarer fish. Players fish at the lake by pressing E to cast, then E again the moment a "!" appears. ${common}`
+ return id==='marlo'?`You run the fish stall beside the lake. You pay players these prices in coins: ${fishPrices()}. Your prices move with supply and demand; today's wheat price at the market is ${priceOf('wheat').toFixed(2)} coins and farmhands earn ${wageNow()} coins a day. You sell golden bait for ${PRICE.bait} coins: the next 3 casts bite faster and catch rarer fish. Players fish at the lake by pressing E to cast, then E again the moment a "!" appears. ${common}`
  :`You run the architect's studio. A house redesign costs ${PRICE.house} coins and a character redesign costs ${PRICE.char} coins. The player paints the new design pixel by pixel in your editor and pays only when they save. Players earn coins by catching fish and selling them to Marlo, the fishmonger by the lake. ${common}`}
 function buildPrompt(id){const s=SHOP[id],n=s.c.name;
  const conv=s.log.filter(m=>!m.pending).slice(-10).map(m=>`${m.n==='You'?'Player':n}: ${m.t}`).join('\n');
@@ -423,7 +506,7 @@ Write only ${n}'s next reply.`}
 function clean(s,n){s=String(s||'').replace(new RegExp('^\\s*'+n+'\\s*:\\s*','i'),'').replace(/^["']|["']$/g,'').replace(/\*[^*]*\*/g,'').replace(/\s+/g,' ').trim();
  if(!s||/\b(as an ai|language model|ai assistant|chatbot|anthropic|claude)\b/i.test(s))return '';if(s.length>240)s=s.slice(0,237).replace(/\s\S*$/,'')+'…';return s}
 function scripted(id,t){t=t.toLowerCase();
- if(id==='marlo'){if(/bait/.test(t))return `Golden bait is ${PRICE.bait} coins for three casts. The fish cannot resist it.`;if(/price|sell|worth|much|pay/.test(t))return `I pay ${fishPrices()} coins.`;if(/where|how|catch|fish|rod/.test(t))return 'Stand by the lake, cast with E, and press E again the moment you see a "!".';return pick(['The golden carp is the one everyone wants. I have seen two all year.','Lake is calm today. Good fishing weather.','Bring me a pike and I will be a happy man.'])}
+ if(id==='marlo'){if(/bait/.test(t))return `Golden bait is ${PRICE.bait} coins for three casts. The fish cannot resist it.`;if(/price|sell|worth|much|pay/.test(t))return `Today I pay ${fishPrices()} coins. Prices shift with how much fish is about.`;if(/where|how|catch|fish|rod/.test(t))return 'Stand by the lake, cast with E, and press E again the moment you see a "!".';return pick(['The golden carp is the one everyone wants. I have seen two all year.','Lake is calm today. Good fishing weather.','Bring me a pike and I will be a happy man.'])}
  if(/house|home|building|roof/.test(t))return `House redesigns are ${PRICE.house} coins. You paint it pixel by pixel and only pay when you save.`;if(/char|outfit|clothes|sprite|look|hair/.test(t))return `A new look is ${PRICE.char} coins. Paint it yourself in my editor.`;if(/coin|money|afford|cheap/.test(t))return 'Short on coins? Marlo buys fish down by the lake.';
  return pick(['Every house in this village started as a sketch on my desk.','Bold colours read best from a distance.','Try the fill tool for big areas, it saves time.'])}
 async function npcReply(id,text){const s=SHOP[id];
@@ -441,14 +524,14 @@ $('sForm').addEventListener('submit',async e=>{e.preventDefault();const id=curSh
  s.log.push({n:'You',t});const pend={n:s.c.name,t:'thinking…',pending:true};s.log.push(pend);busy[id]=true;renderShopLog();
  const reply=await npcReply(id,t);s.log.splice(s.log.indexOf(pend),1);s.log.push({n:s.c.name,t:reply});if(s.log.length>40)s.log.splice(0,s.log.length-40);busy[id]=false;if(curShop===id)renderShopLog()});
 function renderShopBody(){const b=$('sBody');
- if(curShop==='marlo'){const rows=FISH.filter(f=>st.bag[f.n]),total=rows.reduce((s,f)=>s+st.bag[f.n]*f.v,0);
-  b.innerHTML=`<h3 style="margin-top:0">Your catch</h3>`+(total?`<ul class="items">${rows.map(f=>`<li><span class="fishdot" style="background:${f.c}"></span><span>${f.n} × ${st.bag[f.n]}</span><span class="price">${f.v} coins each</span><button data-sell="${f.n}">Sell 1</button></li>`).join('')}</ul><button class="primary wide" data-sellall>Sell everything for ${total} coins</button>`:`<p class="small">No fish yet. Stand by the lake, press E to cast, and press E again the moment a "!" appears.</p>`)
+ if(curShop==='marlo'){const rows=FISH.filter(f=>st.bag[f.n]),total=rows.reduce((s,f)=>s+st.bag[f.n]*fishPrice(f),0);
+  b.innerHTML=`<h3 style="margin-top:0">Your catch</h3>`+(total?`<ul class="items">${rows.map(f=>`<li><span class="fishdot" style="background:${f.c}"></span><span>${f.n} × ${st.bag[f.n]}</span><span class="price">${fishPrice(f)} coins each</span><button data-sell="${f.n}">Sell 1</button></li>`).join('')}</ul><button class="primary wide" data-sellall>Sell everything for about ${total} coins</button><p class="small">Every fish you sell adds to supply, so prices dip as you sell and recover over time.</p>`:`<p class="small">No fish yet. Stand by the lake, press E to cast, and press E again the moment a "!" appears.</p>`)
   +`<h3>Bait</h3><div class="item"><div><b>Golden bait</b><p class="small">Your next 3 casts bite faster and catch rarer fish.${st.bait?` You have ${st.bait} left.`:''}</p></div><button data-bait>Buy for ${PRICE.bait} coins</button></div><h3>Price list</h3><p class="small">${fishPrices()} coins. You have ${st.coins} coins.</p>`}
  else{b.innerHTML=`<h3 style="margin-top:0">Redesign your house</h3><div class="item"><canvas class="thumb" id="thHouse" width="80" height="64"></canvas><div><p class="small">Repaint every pixel of your house. ${PRICE.house} coins when you save.</p><button class="primary" data-ed="house">Open the editor</button></div></div><h3>Redesign your character</h3><div class="item"><canvas class="thumb tall" id="thChar" width="12" height="22"></canvas><div><p class="small">Draw a new outfit or a whole new look. ${PRICE.char} coins when you save.</p><button class="primary" data-ed="char">Open the editor</button></div></div><p class="small">You have ${st.coins} coins. Earn more by fishing and selling to Marlo.</p>`;
   const h=$('thHouse').getContext('2d');h.fillStyle=PAL.grass[0];h.fillRect(0,0,80,64);h.drawImage(houseImage(),0,0);const c=$('thChar').getContext('2d');c.fillStyle=PAL.grass[0];c.fillRect(0,0,12,22);c.drawImage(charImage(player),0,0)}}
 $('sBody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
- if(b.dataset.sell){const f=FISH.find(x=>x.n===b.dataset.sell);if(st.bag[f.n]){st.bag[f.n]--;st.coins+=f.v;toast(`Sold a ${f.n.toLowerCase()} for ${f.v} coins.`)}}
- else if('sellall' in b.dataset){let tot=0;for(const f of FISH){tot+=(st.bag[f.n]||0)*f.v;st.bag[f.n]=0}st.coins+=tot;toast(`Marlo paid you ${tot} coins.`)}
+ if(b.dataset.sell){const f=FISH.find(x=>x.n===b.dataset.sell);if(st.bag[f.n]){const v=fishPrice(f);st.bag[f.n]--;st.coins+=v;MK.fish.stock++;toast(`Sold a ${f.n.toLowerCase()} for ${v} coins.`)}}
+ else if('sellall' in b.dataset){let tot=0;for(const f of FISH){while(st.bag[f.n]>0){tot+=fishPrice(f);st.bag[f.n]--;MK.fish.stock++}}st.coins+=tot;toast(`Marlo paid you ${tot} coins.`)}
  else if('bait' in b.dataset){if(st.coins<PRICE.bait){toast('Not enough coins for bait yet.');return}st.coins-=PRICE.bait;st.bait+=3;toast('Golden bait ready for your next 3 casts.')}
  else if(b.dataset.ed){openEditor(b.dataset.ed);return}
  hud();saveProfile();renderShopBody()});
@@ -526,6 +609,7 @@ async function netJoin(v,name){const sb=NET.sb;
  const ch=sb.channel('village:'+v.name,{config:{presence:{key:NET.uid},broadcast:{self:false}}});
  ch.on('presence',{event:'sync'},syncRemotes)
   .on('broadcast',{event:'move'},({payload})=>onMove(payload))
+  .on('broadcast',{event:'rps'},({payload})=>onRps(payload))
   .on('postgres_changes',{event:'UPDATE',schema:'public',table:'villages',filter:'name=eq.'+v.name},({new:row})=>applyVillage(row))
   .on('postgres_changes',{event:'*',schema:'public',table:'votes',filter:'village=eq.'+v.name},queueTally)
   .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'village=eq.'+v.name},({new:m})=>{if(m.user_id!==NET.uid)addRemoteMsg(m.grp,m.user_id,m.name,m.col,m.body)});
@@ -575,10 +659,86 @@ async function netSaveArt(mode,cnv){if(!NET.ch)return;const url=cnv.toDataURL('i
  const {error}=await NET.sb.from('profiles').update(patch).eq('id',NET.uid);if(error)toast('Design not saved: '+error.message);if(mode==='char')NET.ch.track({name:player.display,col:player.col,sprite:url})}
 renderJoin();
 
+/* ---------- market and farm office ---------- */
+function spark(a,col){if(a.length<2)return '';const mn=Math.min(...a),mx=Math.max(...a),r=mx-mn||1;return `<svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" points="${a.map((v,i)=>`${(i/(a.length-1)*120).toFixed(1)},${(31-(v-mn)/r*28).toFixed(1)}`).join(' ')}"/></svg>`}
+function chg(a){if(a.length<25)return '';const now=a[a.length-1],was=a[a.length-25],d=(now-was)/was*100;if(Math.abs(d)<.5)return '<span class="chg">No change since yesterday</span>';return `<span class="chg ${d>=0?'up':'down'}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(0)}% since yesterday</span>`}
+let mktFocus='market';
+function openMarket(f){mktFocus=f;for(const k in K)K[k]=0;$('mH').textContent=f==='farm'?'Farm office':'Market prices';renderMarket();$('mkt').hidden=false;$('mx').focus({preventScroll:true});}
+function renderMarket(){const pw=priceOf('wheat'),w=wageNow(),rev=FARM.perDay*pw,prof=rev-w,wheat=st.bag.Wheat||0,perch=fishPrice(FISH[1]);
+ let est10=0,estAll=0;{let s=MK.wheat.stock;for(let i=0;i<wheat;i++){const p=MK.wheat.base*Math.min(3,Math.max(.3,MK.wheat.target/Math.max(1,s)));if(i<10)est10+=p;estAll+=p;s++}}
+ const tiles=`<div class="tiles">
+  <div class="tile"><div class="lab">Wheat, per bushel</div><div class="big">${pw.toFixed(2)}</div>${chg(MK.wheat.hist)}${spark(MK.wheat.hist,'#c9a227')}</div>
+  <div class="tile"><div class="lab">Fish (a perch at Marlo's)</div><div class="big">${perch}</div>${chg(MK.fish.hist)}${spark(MK.fish.hist,'#2f7fb8')}</div>
+  <div class="tile"><div class="lab">Farmhand wage, per day</div><div class="big">${w}</div>${chg(LAB.hist)}${spark(LAB.hist,'#c8434b')}</div></div>
+  <p class="small">${freeWorkers()} of ${LAB.pool} village workers are free · village farms employ ${LAB.npc} · ${clock()}</p>`;
+ const farm=`<h3>Your farm</h3><div class="farmbox"><div>
+  <p><b>${FARM.workers} of ${MAXW}</b> farmhands hired · <b>${Math.floor(FARM.grown)}</b> of ${FARM.cap} wheat ready to harvest${FARM.grown>=FARM.cap?' (field full: harvest it!)':''}</p>
+  <p class="small">Each farmhand grows ${FARM.perDay} wheat a day on your rich soil (village farms manage ${NPC_YIELD}). At today's prices that's worth ${rev.toFixed(0)} coins and costs ${w} in wages:</p>
+  <p class="profit ${prof>=0?'up':'down'}">${prof>=0?'+':''}${prof.toFixed(0)} coins per farmhand per day</p>
+  <p class="small">Wages are paid at midnight at that day's market rate. If you can't pay, workers quit. Hiring pulls workers out of the market, which nudges wages up for everyone.</p></div>
+  <div class="row" style="margin-top:0;flex-direction:column;align-items:stretch"><button class="primary" data-hire ${FARM.workers>=MAXW||freeWorkers()<1||st.coins<w?'disabled':''}>Hire a farmhand (${w} coins today)</button><button data-fire ${FARM.workers?'':'disabled'}>Let one go</button>
+  <p class="small">${freeWorkers()<1?'No workers are free right now. Wait for wages to draw more in.':st.coins<w?`You need ${w} coins to hire.`:''}</p></div></div>`;
+ const sell=`<h3>Sell wheat</h3><p>You have <b>${wheat}</b> wheat.${wheat?` Selling adds to supply, so the price slips as you sell.`:' Harvest your farm to get some.'}</p>
+  <div class="row" style="margin-top:6px"><button data-sellw="10" ${wheat>=10?'':'disabled'}>Sell 10 for about ${Math.round(est10)}</button><button class="primary" data-sellw="all" ${wheat?'':'disabled'}>Sell all for about ${Math.round(estAll)}</button></div>`;
+ const nw=`<h3>Village news</h3>${ECO.news.length?`<ul class="news">${ECO.news.slice(0,4).map(n=>`<li><b>Day ${n.d}</b>${esc(n.t)}</li>`).join('')}</ul>`:'<p class="small">Quiet so far. Harvest failures, caravans and feasts will shake prices up.</p>'}`;
+ $('mBody').innerHTML=mktFocus==='farm'?tiles+farm+sell+nw:tiles+sell+farm+nw}
+$('mBody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+ if('hire' in b.dataset){const w=wageNow();if(st.coins<w||freeWorkers()<1||FARM.workers>=MAXW)return;st.coins-=w;FARM.workers++;toast(`Hired a farmhand for ${w} coins today. They start sowing right away.`)}
+ else if('fire' in b.dataset){if(FARM.workers>0){FARM.workers--;toast('You let a farmhand go. They are back on the job market.')}}
+ else if(b.dataset.sellw){const have=st.bag.Wheat||0,n=b.dataset.sellw==='all'?have:Math.min(10,have);let tot=0;for(let i=0;i<n;i++){tot+=priceOf('wheat');MK.wheat.stock++}tot=Math.round(tot);st.bag.Wheat=have-n;st.coins+=tot;toast(`Sold ${n} wheat for ${tot} coins.`)}
+ hud();saveProfile();renderMarket()});
+$('mx').addEventListener('click',()=>$('mkt').hidden=true);
+function harvest(){const n=Math.floor(FARM.grown);if(n<1)return;FARM.grown-=n;st.bag.Wheat=(st.bag.Wheat||0)+n;hud();saveProfile();toast(`You harvested ${n} wheat. Sell it at the market board, or hold it if you think prices will rise.`)}
+
+/* ---------- rock, paper, scissors ---------- */
+const MOVES=['rock','paper','scissors'],BEATS={rock:'scissors',paper:'rock',scissors:'paper'},STAKES=[5,10,25,50];
+const outcome=(a,b)=>a===b?0:BEATS[a]===b?1:-1;
+let RPS={phase:'pick',opp:null,stake:10};
+async function sha(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function rpsOpponents(){const L=members().map(c=>({id:'npc:'+c.name,name:c.name,c}));for(const r of NET.remotes.values())if(r.scene===(player.scene==='home'?'home:'+NET.uid:player.scene))L.push({id:r.id,name:r.name,remote:true});return L}
+function openRps(){if(RPS.phase!=='incoming'&&RPS.phase!=='wait'&&RPS.phase!=='accepted')RPS={phase:'pick',opp:null,stake:RPS.stake||10};for(const k in K)K[k]=0;renderRps();$('rps').hidden=false;$('rx').focus({preventScroll:true});}
+function closeRps(){if(RPS.phase==='incoming')rpsSend({t:'dec',id:RPS.id,to:RPS.from});$('rps').hidden=true;if(RPS.phase!=='wait'&&RPS.phase!=='accepted')RPS={phase:'pick',opp:null,stake:RPS.stake}}
+function moveBtns(attr){return `<div class="moves">${MOVES.map(m=>`<button class="primary" ${attr}="${m}">${m[0].toUpperCase()+m.slice(1)}</button>`).join('')}</div>`}
+function renderRps(){const b=$('rBody');
+ if(RPS.phase==='incoming'){b.innerHTML=`<p><b>${esc(RPS.name)}</b> challenges you for <b>${RPS.stake} coins</b>. Their move is sealed, so they can't change it. Pick yours to accept.</p>${st.coins<RPS.stake?`<p class="small">You only have ${st.coins} coins.</p>`:moveBtns('data-accept')}<div class="row"><button data-decline>Decline</button></div>`;return}
+ if(RPS.phase==='wait'||RPS.phase==='accepted'){b.innerHTML=`<p class="result">Waiting for ${esc(RPS.oppName)}…</p><p class="small">${RPS.phase==='wait'?'They have 30 seconds to answer.':'Checking their sealed move.'}</p>`;return}
+ if(RPS.phase==='done'){b.innerHTML=`<p class="result">${esc(RPS.result)}</p><p class="small">You have ${st.coins} coins.</p><div class="row"><button class="primary" data-again>Play again</button></div>`;return}
+ const opps=rpsOpponents();if(!opps.length){b.innerHTML='<p>Nobody else is at your table. Sit with villagers or other players to make a bet.</p>';return}
+ if(!RPS.opp||!opps.some(o=>o.id===RPS.opp))RPS.opp=opps[0].id;
+ b.innerHTML=`<h3 style="margin-top:0">Who are you playing?</h3><div class="chips">${opps.map(o=>`<button data-opp="${esc(o.id)}" aria-pressed="${o.id===RPS.opp}">${esc(o.name)}${o.remote?' (player)':''}</button>`).join('')}</div>
+  <h3>Stake</h3><div class="chips">${STAKES.map(v=>`<button data-stake="${v}" aria-pressed="${v===RPS.stake}" ${v>st.coins?'disabled':''}>${v} coins</button>`).join('')}</div>
+  <h3>Your move</h3>${st.coins<RPS.stake?`<p class="small">You need ${RPS.stake} coins for this stake.</p>`:moveBtns('data-move')}<p class="small">You have ${st.coins} coins.</p>`}
+function settle(o,oppName,mine,theirs){const s=RPS.stake;st.coins=Math.max(0,st.coins+o*s);hud();saveProfile();
+ RPS.phase='done';RPS.result=o===0?`Draw! You both picked ${mine}.`:o>0?`You win ${s} coins! Your ${mine} beats ${theirs}.`:`${oppName} wins ${s} coins. Their ${theirs} beats your ${mine}.`;
+ if(curGroup)post(curGroup,{name:'Table',col:'#8a7a6a'},o===0?`${player.display} and ${oppName} drew at rock-paper-scissors.`:`${o>0?player.display:oppName} beat ${o>0?oppName:player.display} at rock-paper-scissors for ${s} coins.`);
+ if(!$('rps').hidden)renderRps();else toast(RPS.result)}
+function rpsSend(p){if(NET.ch)NET.ch.send({type:'broadcast',event:'rps',payload:Object.assign({from:NET.uid,name:player.display},p)})}
+$('rBody').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.disabled)return;const d=b.dataset;
+ if(d.opp){RPS.opp=d.opp;renderRps()}else if(d.stake){RPS.stake=+d.stake;renderRps()}else if('again' in d){RPS={phase:'pick',opp:RPS.opp,stake:RPS.stake};renderRps()}
+ else if('decline' in d){rpsSend({t:'dec',id:RPS.id,to:RPS.from});RPS={phase:'pick',opp:null,stake:10};renderRps()}
+ else if(d.move){const opp=rpsOpponents().find(o=>o.id===RPS.opp);if(!opp||st.coins<RPS.stake)return;const mine=d.move;
+  if(!opp.remote){const c=opp.c;c.purse??=Math.floor(rnd(20,90));if(RPS.stake>c.purse){RPS.phase='done';RPS.result=`${c.name} shakes their head. ${RPS.stake} coins is too rich for them.`;renderRps();return}
+   const theirs=pick(MOVES),o=outcome(mine,theirs);c.purse-=o*RPS.stake;c.bubble=o<0?'Ha! Pay up.':o>0?'Well played...':'Again!';c.bt=performance.now()+2500;settle(o,c.name,mine,theirs);return}
+  const salt=Math.random().toString(36).slice(2)+Date.now();RPS=Object.assign(RPS,{phase:'wait',id:'r'+Math.random().toString(36).slice(2),oppId:opp.id,oppName:opp.name,move:mine,salt});
+  rpsSend({t:'ch',id:RPS.id,to:opp.id,stake:RPS.stake,commit:await sha(mine+RPS.salt)});renderRps();
+  const id=RPS.id;setTimeout(()=>{if(RPS.id===id&&RPS.phase==='wait'){RPS.phase='done';RPS.result=`No answer from ${RPS.oppName}. Nothing was bet.`;renderRps()}},30000)}
+ else if(d.accept){if(st.coins<RPS.stake)return;RPS.myMove=d.accept;RPS.phase='accepted';RPS.oppName=RPS.name;rpsSend({t:'acc',id:RPS.id,to:RPS.from,move:d.accept});renderRps();
+  const id=RPS.id;setTimeout(()=>{if(RPS.id===id&&RPS.phase==='accepted'){RPS.phase='done';RPS.result=`${RPS.name} never revealed their move, so the bet is off.`;renderRps()}},20000)}});
+async function onRps(p){if(!p||p.to!==NET.uid)return;const okMove=m=>MOVES.includes(m);
+ if(p.t==='ch'){if(!STAKES.includes(p.stake)||typeof p.commit!=='string')return;if(RPS.phase==='wait'||RPS.phase==='accepted'||RPS.phase==='incoming'){NET.ch.send({type:'broadcast',event:'rps',payload:{t:'dec',id:p.id,to:p.from,from:NET.uid}});return}
+  RPS={phase:'incoming',id:String(p.id),from:p.from,name:String(p.name||'Someone').slice(0,20),stake:p.stake,commit:p.commit};$('rps').hidden=false;renderRps();toast(`${RPS.name} challenged you to rock-paper-scissors for ${p.stake} coins.`)}
+ else if(p.t==='dec'&&RPS.id===p.id&&RPS.phase==='wait'){RPS.phase='done';RPS.result=`${RPS.oppName} declined the bet.`;renderRps()}
+ else if(p.t==='acc'&&RPS.id===p.id&&RPS.phase==='wait'&&p.from===RPS.oppId&&okMove(p.move)){rpsSend({t:'rev',id:RPS.id,to:RPS.oppId,move:RPS.move,salt:RPS.salt});settle(outcome(RPS.move,p.move),RPS.oppName,RPS.move,p.move)}
+ else if(p.t==='rev'&&RPS.id===p.id&&RPS.phase==='accepted'&&p.from===RPS.from&&okMove(p.move)){
+  if(await sha(p.move+p.salt)!==RPS.commit){RPS.phase='done';RPS.result=`${RPS.name}'s move didn't match the one they sealed, so the bet is void.`;renderRps();return}
+  settle(outcome(RPS.myMove,p.move),RPS.name,RPS.myMove,p.move)}}
+$('rpsBtn').addEventListener('click',openRps);
+$('rx').addEventListener('click',closeRps);
+
 /* ---------- ui helpers ---------- */
-function hud(){$('hCoin').textContent=st.coins;$('hFish').textContent=bagCount();$('hCred').textContent=st.credits-spent();$('hTre').textContent=st.treasury;$('hOn').textContent=st.joined?st.online+'/20':'-'}
+function hud(){$('hCoin').textContent=st.coins;$('hFish').textContent=bagCount();$('hClock').textContent=clock();$('hCred').textContent=st.credits-spent();$('hTre').textContent=st.treasury;$('hOn').textContent=st.joined?st.online+'/20':'-'}
 let tt;function toast(s){const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),3800)}
-const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden;
+const modalOpen=()=>!$('join').hidden||!$('vote').hidden||!$('shop').hidden||!$('ed').hidden||!$('mkt').hidden||!$('rps').hidden;
 
 /* ---------- fishing ---------- */
 let fish=null;
@@ -586,7 +746,7 @@ function cast(w){const now=performance.now();fish={phase:'wait',until:now+rnd(18
 function reel(){if(!fish)return;if(fish.phase==='wait'){toast('Too soon. The fish swam off.');fish=null;return}
  const boost=st.bait?2.5:1,tot=FISH.reduce((s,f,i)=>s+f.w*(i>1?boost:1),0);let r=Math.random()*tot,got=FISH[0];for(const [i,f] of FISH.entries()){r-=f.w*(i>1?boost:1);if(r<=0){got=f;break}}
  if(st.bait)st.bait--;st.bag[got.n]=(st.bag[got.n]||0)+1;fish=null;hud();saveProfile();player.bubble=got.n==='Golden carp'?'A golden carp!!':'Got one!';player.bt=performance.now()+2000;
- toast(`You caught a ${got.n.toLowerCase()}! Marlo pays ${got.v} coins for it.`)}
+ toast(`You caught a ${got.n.toLowerCase()}! Marlo pays ${fishPrice(got)} coins for it today.`)}
 function nearWater(){let best=null,bd=26;for(let y=16;y<25;y++)for(let x=29;x<VW;x++){if(village.tiles[y][x]!==2)continue;const d=Math.hypot(player.x-(x*T+8),player.y-6-(y*T+8));if(d<bd){bd=d;best={x,y}}}return best}
 
 /* ---------- movement & interaction ---------- */
@@ -601,6 +761,9 @@ function findTarget(){const sc=scenes[player.scene],px=player.x,py=player.y;
  if(fish)return fish.phase==='bite'?{label:'A bite! Press now!',hot:true,fn:reel}:{label:'Waiting for a bite… press when you see !',fn:reel};
  if(sc===village){
   for(const c of [marlo,vera])if(Math.hypot(px-c.x,py-c.y)<28||c===marlo&&Math.hypot(px-33.5*T,py-16*T)<36)return {label:`Talk to ${c.name}, the ${SHOP[c.shop].role.toLowerCase()}`,fn:()=>openShop(c.shop)};
+  if(Math.hypot(px-(7.5*T),py-(24.5*T))<26)return {label:'Farm office: hire farmhands',fn:()=>openMarket('farm')};
+  if(Math.hypot(px-(15.5*T),py-(15.5*T))<26)return {label:'Check market prices',fn:()=>openMarket('market')};
+  if(px>8*T&&px<12*T&&py>24*T&&py<27*T+4)return FARM.grown>=1?{label:`Harvest ${Math.floor(FARM.grown)} wheat`,fn:harvest}:{label:FARM.workers?'Your crop is growing':'Your farm: hire farmhands at the farm office',fn:()=>openMarket('farm')};
   for(const b of doorsOf()){if(Math.hypot(px-(b.door*T+8),py-((b.y+b.h)*T+6))<14)return {label:b.shop?"Visit Vera's architect studio":'Enter '+b.name,fn:()=>enter(b)}}
   for(const [id,p] of Object.entries(PLOTS))if(!st.built[id]&&px>p.x*T-6&&px<(p.x+p.w)*T+6&&py>p.y*T-4&&py<(p.y+p.h)*T+10)return {label:`Empty plot for a ${p.name.toLowerCase()}`,fn:()=>toast(`Vote at the town hall (north) to build the ${p.name.toLowerCase()}.`)};
   const w=nearWater();if(w)return {label:st.bait?`Cast your line (golden bait: ${st.bait} left)`:'Cast your line',fn:()=>cast(w)}}
@@ -611,7 +774,7 @@ let target=null,lastLabel='';
 function act(){if(modalOpen())return;if(target)target.fn()}
 const K={up:0,down:0,left:0,right:0},KM={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'){if(e.key==='Escape')e.target.blur();return}
- if(e.key==='Escape'){if(!$('ed').hidden)closeEd();else if(!$('shop').hidden)closeShop();else if(!$('vote').hidden)closeVote();else if(fish){fish=null}else stand();return}
+ if(e.key==='Escape'){if(!$('ed').hidden)closeEd();else if(!$('rps').hidden)closeRps();else if(!$('mkt').hidden)$('mkt').hidden=true;else if(!$('shop').hidden)closeShop();else if(!$('vote').hidden)closeVote();else if(fish){fish=null}else stand();return}
  if(modalOpen()||e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;
  if(KM[e.code]){K[KM[e.code]]=1;e.preventDefault()}else if(e.code==='KeyE'||e.code==='Space'||e.code==='Enter'){e.preventDefault();act()}});
 addEventListener('keyup',e=>{if(KM[e.code])K[KM[e.code]]=0});
@@ -629,6 +792,7 @@ function update(dt,now){const sc=scenes[player.scene],locked=modalOpen();
   if(!blocked(sc,nx,player.y)){player.x=nx;player.moving=true}if(!blocked(sc,player.x,ny)){player.y=ny;player.moving=true}
   player.dir=Math.abs(dx)>=Math.abs(dy)?(dx>0?3:2):(dy>0?0:1);
   if(sc!==village&&player.y>(sc.h-1)*T+4)leave()}
+ if(st.joined){ECO.acc+=dt*1000;while(ECO.acc>=HOUR_MS){ECO.acc-=HOUR_MS;ECO.time+=60;hourTick();if(ECO.time%1440===0)newDay();hud()}}
  if(fish){if(fish.phase==='wait'&&now>fish.until){fish.phase='bite';fish.until=now+(st.bait?1300:900)}else if(fish.phase==='bite'&&now>fish.until){fish=null;toast('It got away. Try again.')}}
  for(const c of chars){if(c.scene!=='village'||c.isP)continue;
   if(c.wander){if(c.wait>0){c.wait-=dt;c.moving=false}
@@ -653,6 +817,7 @@ function ground(sc,x,y,now){const t=sc.tiles[y][x],X=x*T,Y=y*T,h=hash(x,y),G=PAL
   if(t===4){const fc=['#f6d55c','#ed6a8a','#ffffff','#a77de8'][(h*40|0)%4];R(fc,X+4,Y+5,2,2);R(fc,X+10,Y+9,2,2);R(fc,X+6,Y+12,2,2)}}
  else if(t===1){R(PAL.path,X,Y,T,T);R(shade(PAL.path,-24),X+(h*12|0)+1,Y+((h*71)%12|0)+1,2,1);R(shade(PAL.path,16),X+((h*37)%12|0)+2,Y+((h*19)%12|0)+2,1,1)}
  else if(t===2){R('#3d9be0',X,Y,T,T);R('#7cc6f2',X+(((now/450+h*6)|0)%10),Y+4+(h*8|0),5,1)}
+ else if(t===6){R('#7a5236',X,Y,T,T);R('#64422a',X,Y+3,T,1);R('#64422a',X,Y+7,T,1);R('#64422a',X,Y+11,T,1);R('#64422a',X,Y+15,T,1)}
  else if(t===5){R('#9a7350',X,Y,T,T);R('#86613f',X,Y+5,T,1);R('#86613f',X,Y+11,T,1)}
  else if(t===10){R(sc.floorC,X,Y,T,T);ctx.fillStyle='rgba(0,0,0,.13)';ctx.fillRect(X,Y+7,T,1);ctx.fillRect(X,Y+15,T,1);ctx.fillRect(X+((x+y)%2?4:11),Y,1,7);ctx.fillRect(X+((x+y)%2?11:4),Y+8,1,7)}
  else if(t===11){if(y<2&&x>0&&x<sc.w-1){R(sc.wallC,X,Y,T,T);if(y===1)R('rgba(0,0,0,.28)',X,Y+12,T,4);else R('rgba(255,255,255,.1)',X,Y,T,2)}else R('#2a2030',X,Y,T,T)}
@@ -691,6 +856,8 @@ function objD(o,now){const X=o.x*T,Y=o.y*T,W=o.w*T,H=o.h*T,f=(now/120|0)%3;
  case 'barrel':R('#8a5a34',X+2,Y+1,12,15);R('#4a3a2a',X+2,Y+4,12,1);R('#4a3a2a',X+2,Y+12,12,1);R('#a8734a',X+4,Y+1,3,15);break;
  case 'fire':R('#6b4226',X+1,Y+11,14,3);R('#8b5a33',X+3,Y+9,10,3);R('#ff7a1a',X+4,Y+3-f,8,8+f);R('#ffb02e',X+5,Y+5-f,6,6);R('#ffe14d',X+7,Y+7-f,2,4);R('rgba(255,180,60,.18)',X-8,Y-8,T+16,T+16);break;
  case 'sign':R('#6b4226',X+7,Y+4,2,12);R('#8b5a33',X,Y+2,15,8);R('#a8734a',X,Y+2,15,2);R('#3a2a20',X+3,Y+5,8,1);R('#3a2a20',X+9,Y+4,1,3);break;
+ case 'hireboard':case 'mktboard':R('rgba(0,0,0,.2)',X+2,Y+14,14,3);R('#6b4226',X+3,Y+6,2,10);R('#6b4226',X+11,Y+6,2,10);R('#8b5a33',X,Y-4,16,12);R('#f4ecd8',X+2,Y-2,12,8);
+  if(o.type==='mktboard'){ctx.fillStyle='#2f8a3a';for(let i=0;i<5;i++)ctx.fillRect(X+3+i*2,Y+4-[2,4,3,6,5][i],1,[2,4,3,6,5][i])}else{R('#c9a227',X+4,Y,3,4);R('#c9a227',X+9,Y,3,4);R('#3a2a20',X+4,Y-1,3,1);R('#3a2a20',X+9,Y-1,3,1)}break;
  case 'fishstall':R('rgba(0,0,0,.2)',X+2,Y+H-2,W,4);R('#6b4226',X+2,Y+6,2,H-6);R('#6b4226',X+W-4,Y+6,2,H-6);for(let i=0;i<W;i+=8)R((i/8)%2?'#ffffff':'#2f7fb8',X+i,Y,8,10);R('#1f5f8f',X,Y+10,W,2);
   R('#8b5a33',X+2,Y+19,W-4,H-19);R('#a8734a',X+2,Y+19,W-4,3);R('#cfe8f5',X+5,Y+15,W-10,4);[['#b8c4cc',7],['#9bbf4a',19],['#d98aa0',31]].forEach(([c,o])=>{R(c,X+o,Y+14,7,3);R(c,X+o+7,Y+13,2,5)});break}}
 function charD(c,now,noShadow){const x=Math.round(c.x),y=Math.round(c.y),step=c.moving?((now/140|0)%2):0;
@@ -703,6 +870,17 @@ function charD(c,now,noShadow){const x=Math.round(c.x),y=Math.round(c.y),step=c.
  const hy=by-15;R(c.skin,x-4,hy,8,7);R(c.hair,x-4,hy-1,8,3);
  if(c.dir===1)R(c.hair,x-4,hy,8,6);else{R(c.hair,x-4,hy+2,1,2);R(c.hair,x+3,hy+2,1,2);const o=c.dir===2?-1:c.dir===3?1:0;R('#231a2a',x-2+o,hy+3,1,2);R('#231a2a',x+1+o,hy+3,1,2)}
  if(c.isP){const b=(now/300|0)%2;R('#ffe14d',x-2,hy-7-b,5,2);R('#ffe14d',x-1,hy-5-b,3,1)}}
+function crops(now){const g=FARM.grown/FARM.cap;
+ for(let y=24;y<27;y++)for(let x=8;x<20;x++){const X=x*T,Y=y*T,mine=x<12,st2=mine?(g<.03?0:g<.3?1:g<.65?2:3):(2+((x+y+Math.floor(ECO.time/240))%2));
+  if(!st2)continue;for(let k=0;k<4;k++){const cx=X+2+k*4,sway=((now/600+x+k)|0)%2;
+   if(st2===1){R('#5cbf4a',cx,Y+10,1,3);R('#5cbf4a',cx+1,Y+9,1,2)}
+   else if(st2===2){R('#3f9a3a',cx,Y+5,1,9);R('#5cbf4a',cx+1,Y+6+sway,1,3)}
+   else{R('#c9a227',cx,Y+4,1,10);R('#f2c23a',cx-1+sway,Y+1,2,4);R('#e0b030',cx,Y+3,1,2)}}}}
+const HANDS=[[8.6,24.7],[10.6,24.7],[9.4,26],[11.4,26],[12.8,24.8],[15.2,25.9],[17.6,24.8],[13.9,26.1],[16.4,24.6],[18.9,26],[14.6,24.9],[19.4,25]];
+const HAIRS=['#3a2618','#7a3b12','#1a1a1a','#d9b45a','#5a2a1a'];
+function farmhands(now){const L=[],npcShown=Math.min(8,Math.round(LAB.npc/4));
+ const mk=(i,mine)=>{const [hx,hy]=HANDS[i],bob=((now/(300+i*37))|0)%2;return {name:'',col:mine?'#c9a227':'#a8893a',hair:HAIRS[i%5],skin:skins[i%5],x:hx*T,y:hy*T+bob,dir:i%2?2:3,moving:!!bob,sit:null}};
+ for(let i=0;i<FARM.workers;i++)L.push(mk(i,true));for(let i=0;i<npcShown;i++)L.push(mk(4+i,false));return L}
 function lanterns(now){const cols=['#ff6b6b','#ffd93d','#6bcbff','#b28dff'];for(const yy of [12*T-2,18*T+2]){R('#3a2a20',16*T,yy,9*T,1);for(let i=0;i<12;i++){const lx=16*T+6+i*12,c=cols[i%4];R(c,lx,yy+2,4,5);if(((now/500|0)+i)%3===0)R('rgba(255,230,120,.25)',lx-3,yy-1,10,11)}}}
 function line(now){if(!fish||player.scene!=='village')return;const hx=player.x+(player.dir===2?-6:6),hy=player.y-12,bob=fish.phase==='bite'?2:Math.round(Math.sin(now/300));
  ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(hx,hy);ctx.quadraticCurveTo((hx+fish.bx)/2,Math.min(hy,fish.by)-10,fish.bx,fish.by+bob);ctx.stroke();
@@ -725,19 +903,21 @@ function draw(now){const sc=scenes[player.scene],vw=cv.width/S,vh=cv.height/S,mw
  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)ground(sc,x,y,now);
  for(const o of sc.objs)if(GROUND.has(o.type))objD(o,now);
  for(const s of sc.seats)seatD(s);
+ if(sc===village)crops(now);
  const L=[];
  if(sc===village){for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(sc.tiles[y][x]===3)L.push({y:(y+1)*T,f:()=>tree(x,y)});
   for(const b of B)L.push({y:(b.y+b.h)*T,f:()=>bld(b)});
   for(const [id,p] of Object.entries(PLOTS))L.push({y:(p.y+p.h)*T,f:()=>!st.built[id]?sign(p):id==='tavern'?bld(p):id==='market'?market(p):towerD(p)})}
  for(const o of sc.objs)if(!GROUND.has(o.type))L.push({y:(o.y+o.h)*T,f:()=>objD(o,now)});
  for(const c of chars)if(c.scene===sc.key)L.push({y:c.y,f:()=>charD(c,now)});
+ if(sc===village)for(const c of farmhands(now))L.push({y:c.y,f:()=>charD(c,now)});
  L.sort((a,b)=>a.y-b.y).forEach(d=>d.f());
  line(now);
  if(sc===village&&st.lanterns)lanterns(now);
  ctx.setTransform(1,0,0,1,0,0);const SX=wx=>(wx-cam.x)*S,SY=wy=>(wy-cam.y)*S;
  if(sc===village){for(const b of doorsOf())txt(b.name,SX((b.x+b.w/2)*T),SY(b.y*T-(b.hall?18:3)),13);
   for(const [id,p] of Object.entries(PLOTS))txt(st.built[id]?p.name:'Plot: '+p.name.toLowerCase(),SX((p.x+p.w/2)*T),SY(st.built[id]?p.y*T-(id==='tower'?16:2):(p.y+p.h/2)*T-8),12);
-  txt('Fishmonger',SX(33.5*T),SY(15*T-2),12);txt('To '+RIVAL,SX(38*T),SY(13*T),12)}
+  txt('Fishmonger',SX(33.5*T),SY(15*T-2),12);txt('Your farm',SX(10*T),SY(24*T-1),12);txt('Village farms',SX(16*T),SY(24*T-1),12);txt('Farm office',SX(7.5*T),SY(24*T-5),12);txt('Market prices',SX(15.5*T),SY(15*T-5),12);txt('To '+RIVAL,SX(38*T),SY(13*T),12)}
  for(const c of chars)if(c.scene===sc.key&&!c.isP&&(c.remote||Math.hypot(c.x-player.x,c.y-player.y)<56)&&!(c.bubble&&now<c.bt))txt(c.name,SX(c.x),SY(c.y-(c.sit?22:26)),12);
  if(fish&&fish.phase==='bite')txt('!',SX(player.x),SY(player.y-28),26,'#ffe14d');
  for(const c of chars)if(c.scene===sc.key&&c.bubble&&now<c.bt)bubble(c)}
